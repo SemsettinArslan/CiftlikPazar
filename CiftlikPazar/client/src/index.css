@@ -1,0 +1,104 @@
+:root {
+  --primary-color: #4a8e3a;
+  --secondary-color: #f0c330;
+  --background-color: #f8f9fa;
+  --text-color: #333;
+  --border-color: #dee2e6;
+  --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  line-height: 1.6;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  background-color: #3d7830;
+  border-color: #3d7830;
+}
+
+.btn-secondary {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+  color: #333;
+}
+
+.btn-secondary:hover {
+  background-color: #e0b52a;
+  border-color: #e0b52a;
+  color: #333;
+}
+
+.card {
+  border-radius: 0.5rem;
+  box-shadow: var(--box-shadow);
+  border: none;
+  transition: transform 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.auth-form {
+  max-width: 450px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: var(--box-shadow);
+}
+
+.footer {
+  background-color: #333;
+  color: white;
+  padding: 2rem 0;
+  margin-top: 3rem;
+}
+
+.hero-section {
+  background-color: var(--primary-color);
+  color: white;
+  text-align: center;
+  padding: 6rem 2rem;
+  border-radius: 0;
+  margin-bottom: 3rem;
+}
+
+.product-card img {
+  height: 200px;
+  object-fit: cover;
+}
+
+.section-title {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 2rem;
+}
+
+.section-title:after {
+  content: '';
+  position: absolute;
+  width: 50%;
+  height: 3px;
+  background-color: var(--primary-color);
+  bottom: -10px;
+  left: 25%;
+} 
