@@ -1,10 +1,6 @@
 # ÇİFTLİK PAZAR
 
 <div align="center">
-  <img src="CiftlikPazar/client/public/logo.png" alt="Çiftlik Pazar Logo" width="200" height="auto" />
-</div>
-
-<div align="center">
   <h2>🌱 Çiftçiden Direkt Tüketiciye 🥕</h2>
 </div>
 
