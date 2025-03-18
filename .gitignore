@@ -14,7 +14,18 @@ jest-test-results.json
 /dist
 /out
 
-# Expo ve React Native
+# environment variables
+.env
+.env.local
+.env*.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+
+# Expo & React Native
 .expo/
 web-build/
 expo-env.d.ts
@@ -29,17 +40,6 @@ android/
 ios/
 .metro-health-check*
 
-# environment variables
-.env
-.env.local
-.env*.local
-.env.development
-.env.development.local
-.env.test
-.env.test.local
-.env.production
-.env.production.local
-
 # logs
 logs
 *.log
@@ -51,6 +51,7 @@ lerna-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+*.pem
 
 # npm
 .npm
@@ -80,7 +81,5 @@ tsconfig.tsbuildinfo
 coverage/
 .nyc_output/
 tmp/
-
-# backend
 uploads/
 config.json 
