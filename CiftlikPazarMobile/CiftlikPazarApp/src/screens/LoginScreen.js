@@ -18,17 +18,40 @@ const LoginScreen = () => {
   const [password, setPassword] = useState('');
   const { login, isLoading } = useAuth();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+
+  // E-posta formatı kontrolü fonksiyonu
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+    if (!email) {
+      Alert.alert('Hata', 'Lütfen e-posta adresinizi girin.');
       return;
     }
 
+    if (!isValidEmail(email)) {
+      Alert.alert('Hata', 'Lütfen geçerli bir e-posta adresi giriniz.');
+      return;
+    }
+
+    if (!password) {
+      Alert.alert('Hata', 'Lütfen şifrenizi girin.');
+      return;
+    }
+
+    setLoading(true);
+
     try {
+      // AuthContext'de hatalar gösterilecek
       await login(email, password);
+      // Başarılı login işlemi AuthContext'de tabs sayfasına yönlendirecek
     } catch (error) {
-      Alert.alert('Giriş Hatası', error.message);
+      // Sessizce devam et, hatalar zaten AuthContext'te gösteriliyor
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,9 +94,9 @@ const LoginScreen = () => {
         <TouchableOpacity 
           style={styles.button}
           onPress={handleLogin}
-          disabled={isLoading}
+          disabled={loading}
         >
-          {isLoading ? (
+          {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.buttonText}>Giriş Yap</Text>
@@ -84,6 +107,13 @@ const LoginScreen = () => {
           <Text style={styles.registerText}>Hesabınız yok mu?</Text>
           <TouchableOpacity onPress={() => router.push("/register")}>
             <Text style={styles.registerLink}>Kayıt Ol</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.farmerContainer}>
+          <Text style={styles.farmerText}>Çiftlik sahibi misiniz?</Text>
+          <TouchableOpacity onPress={() => router.push('/farmer-register')}>
+            <Text style={styles.farmerLink}>Çiftçi Olarak Kayıt Ol</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -164,6 +194,22 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: '#4CAF50',
     fontSize: 14,
+  },
+  farmerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  farmerText: {
+    color: '#333',
+    marginRight: 5,
+  },
+  farmerLink: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
 });
 

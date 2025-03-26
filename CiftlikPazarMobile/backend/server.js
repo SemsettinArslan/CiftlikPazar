@@ -16,6 +16,10 @@ connectDB();
 // Route dosyalarını içe aktar
 const auth = require('./routes/auth');
 const cities = require('./routes/cities');
+const categories = require('./routes/categories');
+const farmers = require('./routes/farmers');
+const products = require('./routes/products');
+const orders = require('./routes/orders');
 
 const app = express();
 
@@ -40,6 +44,10 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // API route'ları
 app.use('/api/auth', auth);
 app.use('/api/cities', cities);
+app.use('/api/categories', categories);
+app.use('/api/farmers', farmers);
+app.use('/api/products', products);
+app.use('/api/orders', orders);
 
 // Basit route
 app.get('/', (req, res) => {

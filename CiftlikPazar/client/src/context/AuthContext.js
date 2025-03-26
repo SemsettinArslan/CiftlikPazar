@@ -1,8 +1,11 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
 export const AuthContext = createContext();
+
+// useAuth hook'u - başka bileşenlerden kolayca AuthContext'e erişmek için
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -49,6 +52,12 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.post('/api/auth/register', userData);
 
       if (res.data.success) {
+        // Eğer çiftçi kaydı ise, token'ı kaydetme ve kullanıcıyı ayarlama (onaya kadar)
+        if (userData.role === 'farmer') {
+          return true; // Başarılı kayıt ama giriş yok
+        }
+        
+        // Normal müşteri kaydı için token ve kullanıcı ayarlaması
         localStorage.setItem('token', res.data.token);
         setUser(res.data.user);
         toast.success('Başarıyla kayıt oldunuz!');
@@ -70,6 +79,15 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.post('/api/auth/login', { email, password });
 
       if (res.data.success) {
+        // Eğer kullanıcı onaylanmamış bir çiftçi ise giriş engelle
+        if (res.data.user.role === 'farmer' && !res.data.user.isApproved) {
+          setError('Çiftçi hesabınız henüz onaylanmamıştır. Onay sürecinden sonra giriş yapabilirsiniz.');
+          toast.warning('Çiftçi hesabınız henüz onaylanmamıştır.');
+          localStorage.removeItem('token'); // Token'ı temizle
+          setLoading(false);
+          return false;
+        }
+        
         localStorage.setItem('token', res.data.token);
         setUser(res.data.user);
         toast.success('Giriş başarılı!');
@@ -141,6 +159,38 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Admin hesabı oluşturmak için geçici yardımcı fonksiyon (DEV ONLY)
+  const createAdminUser = async (email, password) => {
+    try {
+      // 1. Normal kullanıcı olarak kaydol
+      const registerRes = await axios.post('/api/auth/register', {
+        firstName: 'Admin',
+        lastName: 'User',
+        email,
+        password,
+        phone: '5551234567'
+      });
+
+      // 2. Admin hesabı oluştur - bu endpoint normalde production'da bulunmamalı
+      const { data } = await axios.post('/api/auth/make-admin', { 
+        email,
+        secretKey: 'dev_admin_secret_key' // Güvenlik için basit bir anahtar
+      });
+
+      return {
+        success: true,
+        message: 'Admin hesabı başarıyla oluşturuldu',
+        data: data.data
+      };
+    } catch (error) {
+      console.error('Admin oluşturma hatası:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Admin hesabı oluşturulamadı'
+      };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -151,7 +201,10 @@ export const AuthProvider = ({ children }) => {
         login,
         logout,
         forgotPassword,
-        resetPassword
+        resetPassword,
+        createAdminUser,
+        setUser,
+        isAuthenticated: !!user
       }}
     >
       {children}

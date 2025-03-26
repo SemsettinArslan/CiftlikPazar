@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 // Teslimat adresi şeması
@@ -83,7 +83,8 @@ const UserSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    maxlength: [20, 'Telefon numarası 20 karakterden uzun olamaz']
+    maxlength: [20, 'Telefon numarası 20 karakterden uzun olamaz'],
+    unique: [true, 'Bu telefon numarası zaten kullanılıyor']
   },
   address: {
     type: String,
@@ -98,14 +99,22 @@ const UserSchema = new mongoose.Schema({
     maxlength: [50, 'İlçe 50 karakterden uzun olamaz']
   },
   profileImage: {
-    type: String // URL to profile image
+    type: String, // URL to profile image
+    default: 'default-profile.jpg'
   },
   
-  // Rol ve durum - müşteri için basitleştirilmiş
+  // Rol ve durum
   role: {
     type: String,
-    enum: ['customer'],
+    enum: ['customer', 'farmer', 'admin'],
     default: 'customer'
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: function() {
+      return this.role === 'customer' ? 'approved' : 'pending'; // Müşteriler otomatik onaylanır, çiftçiler beklemeye alınır
+    }
   },
   accountStatus: {
     type: String,
@@ -167,11 +176,20 @@ UserSchema.virtual('fullName').get(function() {
 
 // Şifre şifreleme - Pre-save middleware
 UserSchema.pre('save', async function(next) {
+  // Şifre değişmediyse hashleme işlemini atla
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  
+  // Şifreyi hashle
+  try {
+    const salt = await bcryptjs.genSalt(10);
+    this.password = await bcryptjs.hash(this.password, salt);
+    next();
+  } catch (error) {
+    console.error('Şifre hashleme hatası:', error);
+    next(error);
+  }
 });
 
 // JWT Token oluşturma metodu
@@ -183,7 +201,7 @@ UserSchema.methods.getSignedJwtToken = function() {
 
 // Şifre karşılaştırma metodu
 UserSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return await bcryptjs.compare(enteredPassword, this.password);
 };
 
 // Şifre sıfırlama token'ı oluştur

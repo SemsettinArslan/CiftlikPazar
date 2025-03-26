@@ -184,10 +184,10 @@ const HomePage = () => {
             <div className="bg-success text-white p-5 text-center rounded">
               <h2 className="fw-bold">Siz de üretici olmak ister misiniz?</h2>
               <p className="lead mb-4">
-                Ürünlerinizi aracısız bir şekilde müşterilerle buluşturun, daha fazla kazanç elde edin.
+                Ürünlerinizi aracısız bir şekilde müşterilerle buluşturun, daha fazka kazanç elde edin.
               </p>
-              <Button variant="light" size="lg">
-                Şimdi Katılın
+              <Button as={Link} to="/farmer-register" variant="light" size="lg">
+                Çiftçi Başvurusu Yap
               </Button>
             </div>
           </Col>

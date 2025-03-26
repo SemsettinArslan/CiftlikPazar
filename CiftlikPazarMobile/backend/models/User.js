@@ -50,7 +50,7 @@ const PaymentInfoSchema = new mongoose.Schema({
   }
 });
 
-// Sadeleştirilmiş Customer-odaklı User modeli
+// Web uygulamasıyla uyumlu User modeli
 const UserSchema = new mongoose.Schema({
   // Temel bilgiler
   firstName: {
@@ -102,11 +102,18 @@ const UserSchema = new mongoose.Schema({
     type: String // URL to profile image
   },
   
-  // Rol ve durum - müşteri için basitleştirilmiş
+  // Rol ve durum - Web uygulamasıyla uyumlu
   role: {
     type: String,
-    enum: ['customer'],
+    enum: ['customer', 'farmer', 'admin'],
     default: 'customer'
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: function() {
+      return this.role === 'customer' ? 'approved' : 'pending'; // Müşteriler otomatik onaylanır, çiftçiler beklemeye alınır
+    }
   },
   accountStatus: {
     type: String,
@@ -170,11 +177,19 @@ UserSchema.virtual('fullName').get(function() {
 UserSchema.pre('save', async function(next) {
   if (!this.isModified('password')) {
     next();
+    return;
   }
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
+
+// Login sonrası son giriş zamanını güncelle
+UserSchema.methods.updateLastLogin = async function() {
+  this.lastLoginAt = Date.now();
+  return this.save();
+};
 
 // JWT token oluştur
 UserSchema.methods.getSignedJwtToken = function() {

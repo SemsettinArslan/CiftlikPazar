@@ -30,6 +30,26 @@ const RegisterScreen = () => {
   const { register, login, isLoading, API_URL } = useAuth();
   const router = useRouter();
 
+  // E-posta formatını kontrol eden fonksiyon
+  const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Telefon numarası formatlayan fonksiyon
+  const formatPhoneNumber = (text) => {
+    // Sadece rakamları al
+    const cleaned = text.replace(/\D/g, '');
+    // 10 haneye kısıtla
+    return cleaned.slice(0, 10);
+  };
+
+  // Telefon numarası değiştiğinde
+  const handlePhoneChange = (text) => {
+    const formattedPhone = formatPhoneNumber(text);
+    setPhone(formattedPhone);
+  };
+
   // Şehirleri çekme
   useEffect(() => {
     const fetchCities = async () => {
@@ -183,6 +203,18 @@ const RegisterScreen = () => {
       return;
     }
 
+    // E-posta formatı kontrolü
+    if (!isValidEmail(email)) {
+      Alert.alert('Hata', 'Lütfen geçerli bir e-posta adresi giriniz.');
+      return;
+    }
+
+    // Telefon numarası kontrolü
+    if (phone.length < 10) {
+      Alert.alert('Hata', 'Telefon numarası 10 haneli olmalıdır.');
+      return;
+    }
+
     if (password !== confirmPassword) {
       Alert.alert('Hata', 'Şifreler eşleşmiyor.');
       return;
@@ -265,9 +297,9 @@ const RegisterScreen = () => {
         <Text style={styles.label}>Telefon</Text>
         <TextInput
           style={styles.input}
-          placeholder="Telefon numaranızı girin"
+          placeholder="Telefon Numarası"
           value={phone}
-          onChangeText={setPhone}
+          onChangeText={handlePhoneChange}
           keyboardType="phone-pad"
         />
 
@@ -345,9 +377,9 @@ const RegisterScreen = () => {
         <TouchableOpacity 
           style={styles.button}
           onPress={handleRegister}
-          disabled={isLoading || loading}
+          disabled={isLoading}
         >
-          {isLoading || loading ? (
+          {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.buttonText}>Kayıt Ol</Text>
@@ -358,6 +390,13 @@ const RegisterScreen = () => {
           <Text style={styles.loginText}>Zaten hesabınız var mı?</Text>
           <TouchableOpacity onPress={() => router.push('/login')}>
             <Text style={styles.loginLink}>Giriş Yap</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={styles.farmerContainer}>
+          <Text style={styles.farmerText}>Çiftlik sahibi misiniz?</Text>
+          <TouchableOpacity onPress={() => router.push('/farmer-register')}>
+            <Text style={styles.farmerLink}>Çiftçi Olarak Kayıt Ol</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -439,13 +478,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 20,
-    marginBottom: 30,
   },
   loginText: {
     color: '#333',
     marginRight: 5,
   },
   loginLink: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  farmerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  farmerText: {
+    color: '#333',
+    marginRight: 5,
+  },
+  farmerLink: {
     color: '#4CAF50',
     fontWeight: 'bold',
   },

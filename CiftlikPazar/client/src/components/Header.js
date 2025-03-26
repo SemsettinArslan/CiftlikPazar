@@ -2,7 +2,11 @@ import React, { useContext } from 'react';
 import { Navbar, Nav, Container, NavDropdown, Button } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { FaShoppingCart, FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, FaLeaf, FaStore, FaUsers, FaInfoCircle, FaChevronDown } from 'react-icons/fa';
+import { 
+  FaShoppingCart, FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, 
+  FaLeaf, FaStore, FaUsers, FaInfoCircle, FaChevronDown, 
+  FaShieldAlt, FaListAlt, FaUserCheck, FaTachometerAlt
+} from 'react-icons/fa';
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
@@ -102,9 +106,31 @@ const Header = () => {
                     id="username"
                     align="end"
                   >
-                    <NavDropdown.Item as={Link} to="/profile" className="py-2">
-                      <FaUser className="me-2" /> Profil
-                    </NavDropdown.Item>
+                    {user.role === 'admin' && (
+                      <>
+                        <NavDropdown.Item as={Link} to="/admin/dashboard" className="py-2">
+                          <FaTachometerAlt className="me-2" /> Admin Paneli
+                        </NavDropdown.Item>
+                        <NavDropdown.Item as={Link} to="/admin/farmer-requests" className="py-2">
+                          <FaUserCheck className="me-2" /> Çiftçi Başvuruları
+                        </NavDropdown.Item>
+                        <NavDropdown.Divider />
+                      </>
+                    )}
+                    {user.role === 'farmer' && user.isApproved ? (
+                      <>
+                        <NavDropdown.Item as={Link} to="/my-farm" className="py-2">
+                          <FaLeaf className="me-2" /> Çiftliğim
+                        </NavDropdown.Item>
+                        <NavDropdown.Item as={Link} to="/farm-products" className="py-2">
+                          <FaStore className="me-2" /> Ürünlerim
+                        </NavDropdown.Item>
+                      </>
+                    ) : (
+                      <NavDropdown.Item as={Link} to="/profile" className="py-2">
+                        <FaUser className="me-2" /> Profil
+                      </NavDropdown.Item>
+                    )}
                     <NavDropdown.Item as={Link} to="/orders" className="py-2">
                       <FaStore className="me-2" /> Siparişlerim
                     </NavDropdown.Item>
@@ -124,9 +150,10 @@ const Header = () => {
                   >
                     <FaSignInAlt className="me-2" /> Giriş Yap
                   </Button>
-                  <Button 
-                    as={Link} 
-                    to="/register" 
+                  
+                  <Button
+                    as={Link}
+                    to="/register"
                     variant="success"
                     className="d-flex align-items-center"
                   >

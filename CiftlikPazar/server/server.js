@@ -3,10 +3,14 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const path = require('path');
 
 // Routes
 const authRoutes = require('./routes/auth.routes');
 const cityRoutes = require('./routes/city.routes');
+const categoryRoutes = require('./routes/category.routes');
+const farmerRoutes = require('./routes/farmer.routes');
+const userRoutes = require('./routes/user.routes');
 
 // Load environment variables
 dotenv.config();
@@ -19,6 +23,9 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+// Static folder için ayar
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ciftlikpazar', {
   useNewUrlParser: true,
@@ -30,6 +37,9 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ciftlikpa
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/cities', cityRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/farmers', farmerRoutes);
+app.use('/api/users', userRoutes);
 
 // Base route
 app.get('/', (req, res) => {

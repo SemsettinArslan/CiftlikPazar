@@ -8,63 +8,116 @@ const crypto = require('crypto');
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = asyncHandler(async (req, res, next) => {
-  const { 
-    firstName, 
-    lastName,
-    email, 
-    password, 
-    phone,
-    city, 
-    district, 
-    address
-  } = req.body;
+  try {
+    const { 
+      firstName, 
+      lastName,
+      email, 
+      password, 
+      phone,
+      city, 
+      district, 
+      address
+    } = req.body;
 
-  // Zorunlu alanları kontrol et
-  if (!firstName || !lastName || !email || !password || !phone || !city || !district) {
-    return next(new ErrorResponse('Lütfen zorunlu alanları doldurunuz.', 400));
-  }
+    // Zorunlu alanları kontrol et
+    if (!firstName || !lastName || !email || !password) {
+      return next(new ErrorResponse('Lütfen adınızı, soyadınızı, e-posta adresinizi ve şifrenizi giriniz.', 400));
+    }
 
-  // E-posta kullanılıyor mu kontrol et
-  const existingUser = await User.findOne({ email });
-  
-  if (existingUser) {
-    return next(new ErrorResponse('Bu e-posta adresi zaten kullanılıyor', 400));
-  }
+    if (!phone) {
+      return next(new ErrorResponse('Lütfen telefon numaranızı giriniz.', 400));
+    }
 
-  // Teslimat adresi oluştur - adres bilgileri varsa ekle
-  let deliveryAddresses = [];
-  if (address) {
-    const deliveryAddress = {
-      title: 'Ev Adresi', // Varsayılan başlık
-      city: city,
-      district: district,
+    if (!city || !district) {
+      return next(new ErrorResponse('Lütfen il ve ilçe bilgilerinizi giriniz.', 400));
+    }
+
+    // E-posta formatını kontrol et
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return next(new ErrorResponse('Lütfen geçerli bir e-posta adresi giriniz.', 400));
+    }
+
+    // Şifre uzunluğunu kontrol et
+    if (password.length < 6) {
+      return next(new ErrorResponse('Şifre en az 6 karakterden oluşmalıdır.', 400));
+    }
+
+    // E-posta kullanılıyor mu kontrol et
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return next(new ErrorResponse('Bu e-posta adresi zaten kullanılıyor.', 400));
+    }
+
+    // Telefon numarası kullanılıyor mu kontrol et
+    const existingPhone = await User.findOne({ phone });
+    if (existingPhone) {
+      return next(new ErrorResponse('Bu telefon numarası zaten kullanılıyor.', 400));
+    }
+
+    // Teslimat adresi oluştur - adres bilgileri varsa ekle
+    let deliveryAddresses = [];
+    if (address) {
+      const deliveryAddress = {
+        title: 'Ev Adresi', // Varsayılan başlık
+        city: city,
+        district: district,
+        address: address || '',
+        isDefault: true // İlk adres olduğu için varsayılan yap
+      };
+      deliveryAddresses.push(deliveryAddress);
+    }
+
+    // Kullanıcı oluştur
+    const user = await User.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      phone,
+      // Adres alanı opsiyonel, şehir ve ilçe zorunlu
       address: address || '',
-      isDefault: true // İlk adres olduğu için varsayılan yap
-    };
-    deliveryAddresses.push(deliveryAddress);
+      city,
+      district,
+      role: 'customer',
+      accountStatus: 'active',
+      approvalStatus: 'approved',
+      isVerified: false,
+      profileCompleted: true,
+      // Teslimat adresi varsa ekle, yoksa boş dizi gönder
+      deliveryAddresses: deliveryAddresses.length > 0 ? deliveryAddresses : [],
+      // Giriş zamanını başlangıçta kaydet
+      lastLoginAt: Date.now()
+    });
+    
+    // Token oluştur ve yanıt ver
+    sendTokenResponse(user, 201, res);
+  } catch (error) {
+    console.error('Kayıt hatası:', error);
+    
+    // MongoDB duplicate key hatası
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue)[0];
+      let message = 'Bu bilgiler zaten kayıtlı';
+      
+      if (field === 'email') {
+        message = 'Bu e-posta adresi zaten kullanılıyor';
+      } else if (field === 'phone') {
+        message = 'Bu telefon numarası zaten kullanılıyor';
+      }
+      
+      return next(new ErrorResponse(message, 400));
+    }
+    
+    // Validation hatası
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return next(new ErrorResponse(messages.join(', '), 400));
+    }
+    
+    return next(new ErrorResponse('Kayıt işlemi sırasında bir hata oluştu', 500));
   }
-
-  // Kullanıcı oluştur
-  const user = await User.create({
-    firstName,
-    lastName,
-    email,
-    password,
-    phone,
-    // Adres alanı opsiyonel, şehir ve ilçe zorunlu
-    address: address || '',
-    city: city,
-    district: district,
-    role: 'customer',
-    accountStatus: 'active',
-    isVerified: false,
-    profileCompleted: true,
-    // Teslimat adresi varsa ekle, yoksa boş dizi gönder
-    deliveryAddresses: deliveryAddresses.length > 0 ? deliveryAddresses : [],
-    createdAt: Date.now()
-  });
-  
-  sendTokenResponse(user, 201, res);
 });
 
 // @desc    Kullanıcı giriş işlemi
@@ -78,21 +131,45 @@ exports.login = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Lütfen e-posta ve şifre giriniz', 400));
   }
 
-  // Kullanıcıyı kontrol et (şifreyi de seç)
-  const user = await User.findOne({ email }).select('+password');
+  try {
+    // Kullanıcıyı kontrol et (şifreyi de seç)
+    const user = await User.findOne({ email }).select('+password');
 
-  if (!user) {
-    return next(new ErrorResponse('Geçersiz kimlik bilgileri', 401));
+    if (!user) {
+      return next(new ErrorResponse('Bu e-posta adresine sahip kullanıcı bulunamadı', 401));
+    }
+
+    // Şifreleri eşleştir
+    const isMatch = await user.matchPassword(password);
+
+    if (!isMatch) {
+      return next(new ErrorResponse('Şifre hatalı, lütfen tekrar deneyiniz', 401));
+    }
+
+    // Hesap durumunu kontrol et
+    if (user.accountStatus !== 'active') {
+      return next(new ErrorResponse(`Hesabınız ${user.accountStatus} durumunda. Lütfen müşteri hizmetleri ile iletişime geçiniz.`, 401));
+    }
+
+    // Çiftçi hesabı onay durumunu kontrol et
+    if (user.role === 'farmer' && user.approvalStatus === 'pending') {
+      // Onay bekleyen çiftçilere özel mesaj
+      return next(new ErrorResponse('Çiftçi başvurunuz onay bekliyor. Onaylandığında bilgilendirileceksiniz.', 401));
+    } else if (user.role === 'farmer' && user.approvalStatus === 'rejected') {
+      // Reddedilen çiftçilere özel mesaj
+      return next(new ErrorResponse('Çiftçi başvurunuz reddedildi. Lütfen müşteri hizmetleri ile iletişime geçiniz.', 401));
+    }
+
+    // Son giriş zamanını güncelle
+    user.lastLoginAt = Date.now();
+    await user.save({ validateBeforeSave: false });
+
+    // Token oluştur ve yanıt ver
+    sendTokenResponse(user, 200, res);
+  } catch (error) {
+    console.error('Giriş hatası:', error);
+    return next(new ErrorResponse('Giriş yapılırken bir hata oluştu', 500));
   }
-
-  // Şifreleri eşleştir
-  const isMatch = await user.matchPassword(password);
-
-  if (!isMatch) {
-    return next(new ErrorResponse('Geçersiz kimlik bilgileri', 401));
-  }
-
-  sendTokenResponse(user, 200, res);
 });
 
 // @desc    Kullanıcı çıkış işlemi
@@ -451,35 +528,58 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
 });
 
 // Token oluştur ve cookie ile gönder
-const sendTokenResponse = (user, statusCode, res) => {
-  // Token oluştur
-  const token = user.getSignedJwtToken();
+const sendTokenResponse = (user, statusCode, res, extraData = {}) => {
+  try {
+    // Token oluştur
+    const token = user.getSignedJwtToken();
 
-  const options = {
-    expires: new Date(
-      Date.now() + process.env.JWT_EXPIRE.split('d')[0] * 24 * 60 * 60 * 1000
-    ),
-    httpOnly: true
-  };
+    const cookieExpire = process.env.JWT_COOKIE_EXPIRE || 30;
+    console.log('Cookie süresi (gün):', cookieExpire);
 
-  // HTTPS kullanılıyorsa secure flag'i ekle
-  if (process.env.NODE_ENV === 'production') {
-    options.secure = true;
-  }
+    const options = {
+      expires: new Date(
+        Date.now() + cookieExpire * 24 * 60 * 60 * 1000
+      ),
+      httpOnly: true
+    };
 
-  res
-    .status(statusCode)
-    .cookie('token', token, options)
-    .json({
+    // HTTPS kullanılıyorsa secure flag'i ekle
+    if (process.env.NODE_ENV === 'production') {
+      options.secure = true;
+    }
+
+    // Yanıt objesi oluştur
+    const responseObject = {
       success: true,
       token,
-      user: {
-        id: user._id,
-        name: user.name,
+      data: {
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
+        phone: user.phone,
         role: user.role,
-        phoneNumber: user.phoneNumber,
-        addresses: user.addresses
+        approvalStatus: user.approvalStatus,
+        accountStatus: user.accountStatus,
+        city: user.city,
+        district: user.district,
+        deliveryAddresses: user.deliveryAddresses,
+        lastLoginAt: user.lastLoginAt,
+        ...extraData
       }
+    };
+
+    console.log('Token başarıyla oluşturuldu:', token.substring(0, 15) + '...');
+
+    res
+      .status(statusCode)
+      .cookie('token', token, options)
+      .json(responseObject);
+  } catch (error) {
+    console.error('Token oluşturma hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Kimlik doğrulama hatası: ' + error.message
     });
+  }
 }; 

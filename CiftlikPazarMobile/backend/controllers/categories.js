@@ -7,6 +7,11 @@ const path = require('path');
 // @route   GET /api/categories
 // @access  Public
 exports.getCategories = asyncHandler(async (req, res, next) => {
+  // Filtre uygula: sadece aktif kategorileri getir
+  if (!req.query.isActive) {
+    req.query.isActive = true;
+  }
+  
   res.status(200).json(res.advancedResults);
 });
 
@@ -34,12 +39,30 @@ exports.getCategory = asyncHandler(async (req, res, next) => {
 // @route   POST /api/categories
 // @access  Private (Admin)
 exports.createCategory = asyncHandler(async (req, res, next) => {
-  const category = await Category.create(req.body);
-
-  res.status(201).json({
-    success: true,
-    data: category
-  });
+  // category_name alanını kontrol et
+  if (!req.body.category_name) {
+    return next(
+      new ErrorResponse('Kategori adı gereklidir', 400)
+    );
+  }
+  
+  try {
+    const category = await Category.create(req.body);
+    
+    res.status(201).json({
+      success: true,
+      data: category
+    });
+  } catch (error) {
+    // Duplicate kontrolü
+    if (error.code === 11000) {
+      return next(
+        new ErrorResponse('Bu kategori zaten mevcut', 400)
+      );
+    }
+    
+    next(error);
+  }
 });
 
 // @desc    Kategori güncelle

@@ -14,7 +14,8 @@ exports.register = async (req, res) => {
       phone, 
       address, 
       city, 
-      district 
+      district,
+      role // Rol parametresini al 
     } = req.body;
 
     // Zorunlu alanları kontrol et
@@ -52,23 +53,36 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Kullanıcı oluştur - tüm kullanıcılar başlangıçta "customer" (müşteri) olarak kaydolur
+    // Telefon numarası kontrolü
+    if (phone) {
+      const phoneExists = await User.findOne({ phone });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu telefon numarası zaten kullanılıyor'
+        });
+      }
+    }
+
+    // Geçerli role değerlerini kontrol et
+    const validRoles = ['customer', 'farmer'];
+    const userRole = role && validRoles.includes(role) ? role : 'customer';
+
+    // Kullanıcı oluştur
     const userData = {
       firstName,
       lastName,
       email,
       password,
-      role: 'customer', // Her zaman "customer" olarak ayarla
+      role: userRole,
       phone,
       address,
       city,
       district,
       accountStatus: 'active',
-      profileCompleted: false
+      profileCompleted: false,
+      // isApproved değeri model içinde default olarak belirtildi
     };
-    
-    // adminLevel'ı sadece admin rolü için ayarla, normal müşteriler için değil
-    // Bu şekilde, varsayılan değer model içinde belirlenmeyecek
     
     const user = await User.create(userData);
 
@@ -92,31 +106,93 @@ exports.login = async (req, res) => {
 
     // Email ve şifre kontrolü
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Lütfen e-posta ve şifre giriniz' });
+      return res.status(400).json({
+        success: false,
+        message: 'Lütfen e-posta ve şifre giriniz'
+      });
     }
 
-    // Kullanıcıyı kontrol et
+    // Debug log - Giriş denemesi
+    console.log(`Giriş denemesi: ${email}`);
+
+    // Veritabanından kullanıcıyı bul (şifre ile birlikte)
     const user = await User.findOne({ email }).select('+password');
 
+    // Kullanıcı yoksa
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Geçersiz kimlik bilgileri' });
+      console.log(`Kullanıcı bulunamadı: ${email}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Geçersiz e-posta veya şifre'
+      });
     }
+
+    // Debug log - Kullanıcı bulundu
+    console.log(`Kullanıcı bulundu: ${user.email}`);
 
     // Şifre kontrolü
     const isMatch = await user.matchPassword(password);
-
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: 'Geçersiz kimlik bilgileri' });
+      console.log(`Yanlış şifre: ${email}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Geçersiz e-posta veya şifre'
+      });
     }
 
-    // Son giriş zamanını güncelle
-    user.lastLoginAt = Date.now();
-    await user.save();
+    // Debug log - Şifre doğru
+    console.log(`Şifre doğru: ${user.email}`);
 
-    sendTokenResponse(user, 200, res);
+    // Hesap durumu kontrolü - Askıya alınmış veya deaktive edilmişse
+    if (user.accountStatus === 'suspended' || user.accountStatus === 'deactivated') {
+      console.log(`Hesap aktif değil: ${user.email}, Durum: ${user.accountStatus}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Hesabınız şu anda aktif değil'
+      });
+    }
+
+    // Çiftçi hesabı ve onay durumu kontrolü
+    if (user.role === 'farmer') {
+      if (user.approvalStatus === 'pending') {
+        console.log(`Çiftçi hesabı onay bekliyor: ${user.email}`);
+        return res.status(401).json({
+          success: false,
+          message: 'Çiftçi hesabınız hala inceleme aşamasında'
+        });
+      } else if (user.approvalStatus === 'rejected') {
+        console.log(`Çiftçi hesabı reddedildi: ${user.email}`);
+        return res.status(401).json({
+          success: false,
+          message: 'Çiftçi başvurunuz reddedildi. Lütfen destek ekibiyle iletişime geçin.'
+        });
+      }
+    }
+
+    // Son giriş tarihini güncelle
+    await User.findByIdAndUpdate(user._id, { lastLoginAt: Date.now() });
+
+    // JWT token oluştur
+    const token = user.getSignedJwtToken();
+
+    // Debug log - Başarılı giriş
+    console.log(`Başarılı giriş: ${user.email}`);
+
+    // Kullanıcı bilgilerini döndür (şifre hariç)
+    const userWithoutPassword = { ...user.toObject() };
+    delete userWithoutPassword.password;
+
+    res.status(200).json({
+      success: true,
+      token,
+      user: userWithoutPassword
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Sunucu hatası' });
+    console.error('Giriş hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası'
+    });
   }
 };
 
@@ -401,6 +477,71 @@ exports.resetPassword = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Şifre sıfırlama işlemi başarısız oldu'
+    });
+  }
+};
+
+// @desc    Kullanıcıyı admin yap (DEV ONLY)
+// @route   POST /api/auth/make-admin
+// @access  Public (sadece development ortamı için)
+exports.makeAdmin = async (req, res) => {
+  try {
+    // Sadece development ortamında çalışsın
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Sayfa bulunamadı'
+      });
+    }
+
+    const { email, secretKey } = req.body;
+
+    // Basit güvenlik kontrolü
+    if (secretKey !== 'dev_admin_secret_key') {
+      return res.status(401).json({
+        success: false,
+        message: 'Geçersiz anahtar'
+      });
+    }
+
+    // Email kontrolü
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lütfen e-posta adresi giriniz'
+      });
+    }
+
+    // Kullanıcıyı bul
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    // Admin rolü ver
+    user.role = 'admin';
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Kullanıcı admin yapıldı',
+      data: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Admin yapma hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
     });
   }
 }; 
