@@ -104,7 +104,7 @@ export default function TabLayout() {
           key="admin"
           name="admin"
           options={{
-            title: 'Admin Panel',
+            title: 'Admin Paneli',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="settings-outline" size={size} color={color} />
             ),

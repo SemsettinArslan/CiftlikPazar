@@ -52,9 +52,22 @@ export default function AdminLayout() {
   return (
     <Stack>
       <Stack.Screen 
+        name="index" 
+        options={{ 
+          headerTitle: "Admin Paneli",
+          headerStyle: {
+            backgroundColor: '#fff',
+          },
+          headerTitleStyle: {
+            color: '#333',
+            fontWeight: 'bold',
+          }
+        }} 
+      />
+      <Stack.Screen 
         name="farmer-requests" 
         options={{ 
-          headerTitle: "Çiftçi Başvuruları",
+          headerTitle: "Admin Paneli",
           headerStyle: {
             backgroundColor: '#fff',
           },

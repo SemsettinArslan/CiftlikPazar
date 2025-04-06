@@ -1,8 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-// API URL
-// Daha güvenilir olması için IP adresini kullanıyoruz, localhost bazen çalışmıyor
-const API_URL = 'http://192.168.43.11:5000/api';
+// API URL - Platformlara göre URL'leri ayarla
+const getApiUrl = () => {
+  // Android emülatörde localhost yerine 10.0.2.2 kullanılır
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5000/api'; // Android için localhost
+  } else {
+    return 'http://localhost:5000/api'; // iOS için localhost
+  }
+};
+
+const API_URL = getApiUrl();
 
 // Token ile istek gönderme yardımcı fonksiyonu
 const fetchWithToken = async (endpoint, options = {}) => {

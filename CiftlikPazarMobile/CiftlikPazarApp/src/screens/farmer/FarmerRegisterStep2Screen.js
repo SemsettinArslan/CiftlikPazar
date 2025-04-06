@@ -644,6 +644,18 @@ const FarmerRegisterStep2Screen = () => {
     }
   };
 
+  // API URL'ini Platform'a göre belirle
+  const getApiUrl = () => {
+    // Android emülatörde localhost yerine 10.0.2.2 kullanılır
+    if (Platform.OS === 'android') {
+      return 'http://10.0.2.2:5000/api'; // Android için localhost
+    } else {
+      return 'http://localhost:5000/api'; // iOS için localhost
+    }
+  };
+
+  let API_URL = getApiUrl();
+
   // API çağrısı ve hata yönetimi
   const handleSubmit = async () => {
     const { farmName, city, district, address, taxNumber, categories, hasShipping, description } = formData;
@@ -669,31 +681,6 @@ const FarmerRegisterStep2Screen = () => {
     setLoading(true);
     
     try {
-      // API URL'ini al
-      const userInfo = await AsyncStorage.getItem('user');
-      let API_URL = 'http://192.168.43.11:5000/api';
-      
-      if (userInfo) {
-        const parsedUserInfo = JSON.parse(userInfo);
-        if (parsedUserInfo.API_URL) {
-          API_URL = parsedUserInfo.API_URL;
-        }
-      }
-
-      // Şehir bilgisi için mevcut şehir ID'si yerine şehir adını alma
-      let cityName = city;
-      if (cities && cities.length > 0) {
-        const selectedCity = cities.find(c => c._id === city || c.id === city);
-        if (selectedCity) {
-          // Şehir nesnesinde isim bilgisinin olabileceği tüm alanları kontrol et
-          cityName = selectedCity.city_name || selectedCity.name || selectedCity.il_adi || selectedCity.city || city;
-          
-          // Debug için şehir nesnesini ve belirlenen ismi yazdır
-          console.log('Seçilen şehir nesnesi:', selectedCity);
-          console.log('Belirlenen şehir adı:', cityName);
-        }
-      }
-      
       // API'yi çağır
       const response = await fetch(`${API_URL}/farmers/complete-registration`, {
         method: 'POST',
@@ -710,7 +697,7 @@ const FarmerRegisterStep2Screen = () => {
           // Çiftlik verileri  
           farmInfo: {
             farmName,
-            city: cityName, // ObjectID yerine şehir adını gönder
+            city: city,
             district,
             address,
             taxNumber,

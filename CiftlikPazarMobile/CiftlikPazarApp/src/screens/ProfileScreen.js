@@ -5,27 +5,44 @@ import {
   Text, 
   TouchableOpacity, 
   ScrollView, 
-  Alert
+  Alert,
+  Pressable
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { useRouter } from 'expo-router';
 
 const ProfileScreen = ({ navigation }) => {
   const { user, logout, isLoading } = useAuth();
+  const router = useRouter(); // Expo Router
+
+  // İki farklı şekilde yönlendirmeyi deneme yöntemi
+  const goToEditProfile = () => {
+    // Yöntem 1: Direkt Expo Router kullanımı
+    try {
+      console.log("Profili düzenleme sayfasına yönlendiriliyor...");
+      router.push("/edit-profile");
+    } catch (error) {
+      console.error("Expo Router hatası:", error);
+      
+      // Yöntem 2: Geleneksel React Navigation kullanımı
+      try {
+        console.log("React Navigation ile yönlendirme deneniyor...");
+        navigation.navigate("EditProfile");
+      } catch (navError) {
+        console.error("Navigation hatası:", navError);
+        Alert.alert("Hata", "Profil düzenleme sayfasına yönlendirilemedi.");
+      }
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
       'Çıkış Yap',
       'Hesabınızdan çıkış yapmak istediğinize emin misiniz?',
       [
-        {
-          text: 'İptal',
-          style: 'cancel'
-        },
-        {
-          text: 'Çıkış Yap',
-          onPress: () => logout()
-        }
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Çıkış Yap', onPress: () => logout() }
       ]
     );
   };
@@ -81,9 +98,22 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>{user?.name || 'Kullanıcı'}</Text>
           <Text style={styles.profileEmail}>{user?.email || 'kullanici@ornek.com'}</Text>
-          <TouchableOpacity style={styles.editButton}>
-            <Text style={styles.editButtonText}>Profili Düzenle</Text>
-          </TouchableOpacity>
+          
+          {/* YENİ BUTON - Pressable daha güvenilir dokunma algılaması sağlar */}
+          <Pressable 
+            style={({pressed}) => [
+              styles.newEditButton,
+              {
+                backgroundColor: pressed ? '#3c8c40' : '#4CAF50',
+                transform: [{ scale: pressed ? 0.98 : 1 }]
+              }
+            ]}
+            onPress={goToEditProfile}
+            android_ripple={{ color: '#3c8c40' }}
+          >
+            <Ionicons name="create-outline" size={18} color="white" style={{marginRight: 5}} />
+            <Text style={styles.newEditButtonText}>Profili Düzenle</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -159,16 +189,25 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 10,
   },
-  editButton: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 15,
+  newEditButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    marginTop: 10,
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  editButtonText: {
-    fontSize: 12,
-    color: '#555',
+  newEditButtonText: {
+    fontSize: 14,
+    color: 'white',
+    fontWeight: 'bold',
   },
   menuContainer: {
     backgroundColor: '#fff',

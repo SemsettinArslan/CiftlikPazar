@@ -289,12 +289,12 @@ exports.forgotPassword = async (req, res) => {
     }
 
     // Sıfırlama token'ı oluştur
-    const resetToken = user.getResetPasswordToken();
+    const resetToken = await user.getResetPasswordToken();
 
     // Token'ı veritabanına kaydet
     await user.save({ validateBeforeSave: false });
 
-    // Sıfırlama URL'i oluştur
+    // Şifre sıfırlama URL'i oluştur
     const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
 
     // E-posta içeriği

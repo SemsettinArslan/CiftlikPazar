@@ -23,8 +23,9 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Static folder için ayar
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+// Static uploads klasörü için ayar - ana dizindeki ortak uploads klasörü
+const uploadsPath = path.join(__dirname, '../../uploads');
+app.use('/uploads', express.static(uploadsPath));
 
 // Database connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ciftlikpazar', {

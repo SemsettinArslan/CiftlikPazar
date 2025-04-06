@@ -1,12 +1,22 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useSegments } from 'expo-router';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
   return useContext(AuthContext);
+};
+
+// API URL - Platformlara göre URL'leri ayarla
+const getApiUrl = () => {
+  // Android emülatörde localhost yerine 10.0.2.2 kullanılır
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5000/api'; // Android için localhost
+  } else {
+    return 'http://localhost:5000/api'; // iOS için localhost
+  }
 };
 
 export const AuthProvider = ({ children }) => {
@@ -15,9 +25,8 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const router = useRouter();
 
-  // API URL'i buradan değiştirin (Tüm uygulamada yansıyacaktır)
-  const API_URL = 'http://192.168.124.92:5000/api';
-  // const API_URL = 'https://ciftlikpazar.com/api';  // Prod URL'i (gerektiğinde açın)
+  // API URL'i dinamik olarak al
+  const API_URL = getApiUrl();
 
   useEffect(() => {
     // Check if user is logged in

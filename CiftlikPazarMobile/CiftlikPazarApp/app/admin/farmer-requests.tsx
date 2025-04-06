@@ -97,11 +97,14 @@ export default function FarmerRequestsScreen() {
     }
   }, [user]);
 
-  // İkinci kontrol - isAdmin state'i false ise yönlendir
-  if (!isAdmin) {
-    console.log('FarmerRequests - Secondary check: isAdmin state is false');
-    return <Redirect href="/(tabs)" />;
-  }
+  // Komponent yüklendiğinde ve API_URL, token değiştiğinde verileri çek
+  useEffect(() => {
+    // Sadece admin kullanıcılar için verileri yükle
+    if (isAdmin && user?.token) {
+      console.log('FarmerRequests - Loading data for admin user');
+      fetchPendingFarmers();
+    }
+  }, [API_URL, user?.token, isAdmin]);
 
   // Kategori isimlerini formatlı şekilde çıkaran yardımcı fonksiyon
   const formatCategories = (categories: any[]): string => {
@@ -333,15 +336,6 @@ export default function FarmerRequestsScreen() {
     setRejectionReason('');
   };
 
-  // Komponent yüklendiğinde ve API_URL, token değiştiğinde verileri çek
-  useEffect(() => {
-    // Sadece admin kullanıcılar için verileri yükle
-    if (isAdmin && user?.token) {
-      console.log('FarmerRequests - Loading data for admin user');
-      fetchPendingFarmers();
-    }
-  }, [API_URL, user?.token, isAdmin]);
-
   // Geri butonuna basıldığında admin paneline dön
   const handleBack = () => {
     router.back();
@@ -389,16 +383,7 @@ export default function FarmerRequestsScreen() {
     <>
       <Stack.Screen 
         options={{
-          title: 'Çiftçi Başvuruları',
-          headerTitleStyle: { fontWeight: 'bold' },
-          headerLeft: () => (
-            <TouchableOpacity 
-              onPress={handleBack}
-              style={{ marginLeft: 10 }}
-            >
-              <Ionicons name="arrow-back" size={24} color="#333" />
-            </TouchableOpacity>
-          ),
+          headerShown: false
         }} 
       />
       
