@@ -16,6 +16,7 @@ import FarmerRegisterPage from './pages/FarmerRegisterPage';
 import FarmerRegisterStep2Page from './pages/FarmerRegisterStep2Page';
 import FarmerRegisterCompletePage from './pages/FarmerRegisterCompletePage';
 import ProfilePage from './pages/ProfilePage';
+import FarmProfileEditPage from './pages/FarmProfileEditPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminFarmerRequestsPage from './pages/admin/AdminFarmerRequestsPage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -39,6 +40,11 @@ function App() {
             <Route path="/profile" element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/farm-profile-edit" element={
+              <ProtectedRoute>
+                <FarmProfileEditPage />
               </ProtectedRoute>
             } />
 
