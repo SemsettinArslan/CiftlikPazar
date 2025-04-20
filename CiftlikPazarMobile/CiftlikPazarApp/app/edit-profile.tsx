@@ -1,11 +1,10 @@
+import React from 'react';
 import EditProfileScreen from '../src/screens/EditProfileScreen';
-import { View, Text, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { View, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 
 export default function EditProfilePage() {
-  const navigation = useNavigation();
-  
+  // Loglama ile debug etmeyi kolaylaştırma
   console.log('edit-profile sayfası yükleniyor...');
   
   return (
@@ -20,7 +19,7 @@ export default function EditProfilePage() {
           }
         }}
       />
-      <EditProfileScreen navigation={navigation} />
+      <EditProfileScreen />
     </View>
   );
 }

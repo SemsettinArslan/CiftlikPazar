@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
+import { useRouter } from 'expo-router';
 
 // ProfileMenuItem için prop tipleri
 interface ProfileMenuItemProps {
@@ -21,6 +22,7 @@ interface ProfileMenuItemProps {
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const router = useRouter();
 
   const handleLogout = () => {
     Alert.alert(
@@ -38,6 +40,12 @@ export default function ProfileScreen() {
         }
       ]
     );
+  };
+
+  // Profil düzenleme sayfasına yönlendir
+  const goToEditProfile = () => {
+    console.log('Profil düzenleme sayfasına yönlendiriliyor...');
+    router.push('/edit-profile');
   };
 
   // Profil menü öğesi
@@ -72,7 +80,7 @@ export default function ProfileScreen() {
         <Text style={styles.userName}>{user?.name || 'Kullanıcı'}</Text>
         <Text style={styles.userEmail}>{user?.email || 'kullanici@ornek.com'}</Text>
         
-        <TouchableOpacity style={styles.editButton}>
+        <TouchableOpacity style={styles.editButton} onPress={goToEditProfile}>
           <Text style={styles.editButtonText}>Profili Düzenle</Text>
         </TouchableOpacity>
       </View>
