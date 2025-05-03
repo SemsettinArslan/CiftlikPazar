@@ -42,6 +42,7 @@ export default function RootLayout() {
           <Stack.Screen name="farmer-register-complete" />
           <Stack.Screen name="EditProfile" />
           <Stack.Screen name="edit-profile" />
+          <Stack.Screen name="product-detail" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="hidden" />
         </Stack>

@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 // Örnek kategoriler
 const CATEGORIES = [
@@ -22,7 +23,7 @@ const CATEGORIES = [
 ];
 
 // Örnek ürünler
-const PRODUCTS = [
+export const PRODUCTS = [
   { id: '1', name: 'Taze Domates', price: '12.90', unit: 'kg', category: 'vegetables', isFavorite: false, rating: 4.8 },
   { id: '2', name: 'Organik Elma', price: '15.50', unit: 'kg', category: 'fruits', isFavorite: true, rating: 4.5 },
   { id: '3', name: 'Köy Peyniri', price: '80.00', unit: 'kg', category: 'dairy', isFavorite: false, rating: 4.9 },
@@ -42,6 +43,7 @@ export default function ProductsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [favorites, setFavorites] = useState<string[]>([]);
+  const router = useRouter();
 
   // Favori ekle/çıkar
   const toggleFavorite = (productId: string) => {
@@ -83,19 +85,30 @@ export default function ProductsScreen() {
     );
   };
 
+  // Ürün detayına git
+  const goToProductDetail = (productId: string) => {
+    router.push(`/product-detail?id=${productId}` as any);
+  };
+
   // Ürün kartını render et
   const renderProductItem = ({ item }: { item: typeof PRODUCTS[0] }) => {
     const isFavorite = favorites.includes(item.id);
     
     return (
-      <View style={styles.productCard}>
+      <TouchableOpacity 
+        style={styles.productCard}
+        onPress={() => goToProductDetail(item.id)}
+      >
         <View style={styles.productImageContainer}>
           <View style={styles.productImagePlaceholder}>
             <Ionicons name="image-outline" size={40} color="#ccc" />
           </View>
           <TouchableOpacity
             style={styles.favoriteButton}
-            onPress={() => toggleFavorite(item.id)}
+            onPress={(e) => {
+              e.stopPropagation(); // Üst TouchableOpacity'nin tetiklenmesini önle
+              toggleFavorite(item.id);
+            }}
           >
             <Ionicons
               name={isFavorite ? 'heart' : 'heart-outline'}
@@ -114,11 +127,17 @@ export default function ProductsScreen() {
             <Ionicons name="star" size={14} color="#FFD700" />
             <Text style={styles.ratingText}>{item.rating}</Text>
           </View>
-          <TouchableOpacity style={styles.addButton}>
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={(e) => {
+              e.stopPropagation(); // Üst TouchableOpacity'nin tetiklenmesini önle
+              // Sepete ekleme işlemi burada yapılabilir
+            }}
+          >
             <Ionicons name="add" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
