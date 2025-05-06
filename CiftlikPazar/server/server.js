@@ -11,6 +11,7 @@ const cityRoutes = require('./routes/city.routes');
 const categoryRoutes = require('./routes/category.routes');
 const farmerRoutes = require('./routes/farmer.routes');
 const userRoutes = require('./routes/user.routes');
+const productRoutes = require('./routes/product.routes');
 
 // Load environment variables
 dotenv.config();
@@ -41,6 +42,7 @@ app.use('/api/cities', cityRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/farmers', farmerRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/products', productRoutes);
 
 // Base route
 app.get('/', (req, res) => {

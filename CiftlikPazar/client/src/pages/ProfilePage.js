@@ -1168,30 +1168,6 @@ const ProfilePage = () => {
             </Button>
           </Modal.Footer>
         </Modal>
-
-        {user && user.isFarmer && activeTab === 'profile' && (
-          <Card className="border-0 shadow-sm mb-4 mt-4">
-            <Card.Header className="bg-light d-flex justify-content-between align-items-center py-3">
-              <h5 className="mb-0 fw-bold d-flex align-items-center">
-                <FaBuilding className="me-2 text-success" /> Çiftlik Profili
-              </h5>
-              <Button 
-                variant="success" 
-                size="sm"
-                className="d-inline-flex align-items-center px-3 py-2"
-                onClick={() => navigate('/farm-profile-edit')}
-              >
-                <FaEdit className="me-2" /> Çiftlik Profilini Düzenle
-              </Button>
-            </Card.Header>
-            <Card.Body className="p-4">
-              <Alert variant="info" className="d-flex align-items-center">
-                <FaExclamationTriangle className="me-2" />
-                Çiftlik profilinizi düzenlemek için yukarıdaki butona tıklayın. Çiftlik bilgileriniz, müşterilerinizin sizi bulmasına yardımcı olur.
-              </Alert>
-            </Card.Body>
-          </Card>
-        )}
       </Container>
     </div>
   );

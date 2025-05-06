@@ -54,6 +54,7 @@ export const AuthProvider = ({ children }) => {
       if (res.data.success) {
         // Eğer çiftçi kaydı ise, token'ı kaydetme ve kullanıcıyı ayarlama (onaya kadar)
         if (userData.role === 'farmer') {
+          toast.success('Çiftçi kaydınız başarıyla oluşturuldu! Onay sürecinden sonra giriş yapabilirsiniz.');
           return true; // Başarılı kayıt ama giriş yok
         }
         
@@ -80,7 +81,7 @@ export const AuthProvider = ({ children }) => {
 
       if (res.data.success) {
         // Eğer kullanıcı onaylanmamış bir çiftçi ise giriş engelle
-        if (res.data.user.role === 'farmer' && !res.data.user.isApproved) {
+        if (res.data.user.role === 'farmer' && res.data.user.approvalStatus !== 'approved') {
           setError('Çiftçi hesabınız henüz onaylanmamıştır. Onay sürecinden sonra giriş yapabilirsiniz.');
           toast.warning('Çiftçi hesabınız henüz onaylanmamıştır.');
           localStorage.removeItem('token'); // Token'ı temizle

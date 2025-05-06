@@ -11,7 +11,9 @@ const {
   addCertificate,
   getCertificates,
   deleteCertificate,
-  verifyCertificate
+  verifyCertificate,
+  createFarmerRecordForExistingUser,
+  updateFarmer
 } = require('../controllers/farmer.controller');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -23,6 +25,12 @@ router.post('/complete-registration', completeRegistration);
 // Eski kayıt rotaları - Artık kullanılmıyor
 // router.post('/public', registerFarmerPublic);
 // router.post('/', protect, registerFarmer);
+
+// Admin/Debug - Eksik çiftçi kaydı oluşturma
+router.post('/admin/create-farmer-record', protect, authorize('admin'), createFarmerRecordForExistingUser);
+
+// Çiftçi profili güncelleme
+router.put('/update', protect, authorize('farmer'), updateFarmer);
 
 // Çiftçi profili rotaları
 router.route('/me')

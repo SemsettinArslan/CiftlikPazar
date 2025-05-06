@@ -3,6 +3,8 @@ const User = require('../models/user.model');
 const sendEmail = require('../utils/emailer');
 const mongoose = require('mongoose');
 const bcryptjs = require('bcryptjs');
+const asyncHandler = require('express-async-handler');
+const router = require('express').Router();
 
 // @desc    Çiftçi kaydı oluştur
 // @route   POST /api/farmers
@@ -20,8 +22,11 @@ exports.registerFarmer = async (req, res) => {
       description 
     } = req.body;
 
+    console.log(`[DEBUG] Çiftçi kaydı oluşturma isteği - User ID: ${req.user.id}`);
+
     // Zorunlu alanları kontrol et
     if (!farmName || !city || !district || !address || !taxNumber || !categories || categories.length === 0) {
+      console.log('[DEBUG] Eksik bilgi ile çiftçi kaydı başarısız');
       return res.status(400).json({
         success: false,
         message: 'Lütfen tüm gerekli alanları doldurun'
@@ -31,6 +36,7 @@ exports.registerFarmer = async (req, res) => {
     // Vergi numarası kontrolü
     const taxExists = await Farmer.findOne({ taxNumber });
     if (taxExists) {
+      console.log(`[DEBUG] Vergi numarası zaten kullanımda: ${taxNumber}`);
       return res.status(400).json({
         success: false,
         message: 'Bu vergi numarası zaten kullanılıyor'
@@ -40,6 +46,7 @@ exports.registerFarmer = async (req, res) => {
     // Kullanıcının daha önce bir çiftçi kaydı var mı kontrol et
     const existingFarmer = await Farmer.findOne({ user: req.user.id });
     if (existingFarmer) {
+      console.log(`[DEBUG] Kullanıcı zaten bir çiftçi kaydına sahip - User ID: ${req.user.id}`);
       return res.status(400).json({
         success: false,
         message: 'Bu kullanıcıya ait bir çiftlik kaydı zaten mevcut'
@@ -49,6 +56,7 @@ exports.registerFarmer = async (req, res) => {
     // Kullanıcı bilgilerini al
     const user = await User.findById(req.user.id);
     if (!user) {
+      console.log(`[DEBUG] Kullanıcı bulunamadı - User ID: ${req.user.id}`);
       return res.status(404).json({
         success: false,
         message: 'Kullanıcı bulunamadı'
@@ -56,6 +64,7 @@ exports.registerFarmer = async (req, res) => {
     }
 
     // Çiftçi oluştur
+    console.log(`[DEBUG] Çiftçi kaydı oluşturuluyor - User ID: ${req.user.id}, Farm Name: ${farmName}`);
     const farmer = await Farmer.create({
       user: req.user.id,
       farmName,
@@ -67,13 +76,18 @@ exports.registerFarmer = async (req, res) => {
       hasShipping: hasShipping || false,
       description
     });
+    console.log(`[DEBUG] Çiftçi kaydı oluşturuldu - Farmer ID: ${farmer._id}`);
 
     // Kullanıcı onay durumunu beklemede olarak güncelle
-    await User.findByIdAndUpdate(
+    const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
-      { approvalStatus: 'pending' },
+      { 
+        role: 'farmer',
+        approvalStatus: 'pending' 
+      },
       { new: true }
     );
+    console.log(`[DEBUG] Kullanıcı rol ve onay durumu güncellendi - Role: ${updatedUser.role}, Approval Status: ${updatedUser.approvalStatus}`);
 
     // Not: E-posta gönderme kısmı completeRegistration fonksiyonuna taşındı
 
@@ -82,7 +96,7 @@ exports.registerFarmer = async (req, res) => {
       data: farmer
     });
   } catch (error) {
-    console.error('Çiftçi kaydı hatası:', error);
+    console.error('[DEBUG] Çiftçi kaydı hatası:', error);
     res.status(500).json({
       success: false,
       message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
@@ -1186,4 +1200,148 @@ exports.verifyCertificate = async (req, res) => {
       message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
     });
   }
-}; 
+};
+
+// @desc    Mevcut kullanıcı için çiftçi kaydı oluştur (Admin/Debug)
+// @route   POST /api/admin/create-farmer-record
+// @access  Admin only
+exports.createFarmerRecordForExistingUser = async (req, res) => {
+  try {
+    const { userId, farmName, city, district, address, taxNumber } = req.body;
+    
+    if (!userId || !farmName || !city || !district || !address || !taxNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tüm gerekli alanları doldurun'
+      });
+    }
+    
+    // Kullanıcı var mı kontrol et
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+    
+    console.log(`[DEBUG] Admin tarafından çiftçi kaydı oluşturuluyor - User ID: ${userId}`);
+    
+    // Mevcut çiftçi kaydı var mı kontrol et
+    const existingFarmer = await Farmer.findOne({ user: userId });
+    if (existingFarmer) {
+      console.log(`[DEBUG] Bu kullanıcıya ait zaten bir çiftçi kaydı mevcut - Farmer ID: ${existingFarmer._id}`);
+      return res.status(400).json({
+        success: false, 
+        message: 'Bu kullanıcıya ait bir çiftlik kaydı zaten mevcut'
+      });
+    }
+    
+    // Vergi numarası kontrolü
+    const taxExists = await Farmer.findOne({ taxNumber });
+    if (taxExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu vergi numarası zaten kullanılıyor'
+      });
+    }
+    
+    // Varsayılan kategoriler
+    const categories = req.body.categories || ["6804d8c4df7290e8dbdfa721"]; // Varsayılan kategori ID'si
+    
+    // Yeni çiftçi kaydı oluştur
+    const farmer = await Farmer.create({
+      user: userId,
+      farmName,
+      city,
+      district,
+      address,
+      taxNumber,
+      categories,
+      hasShipping: req.body.hasShipping || false,
+      description: req.body.description || `${farmName} çiftliği`
+    });
+    
+    console.log(`[DEBUG] Çiftçi kaydı başarıyla oluşturuldu - Farmer ID: ${farmer._id}`);
+    
+    // Kullanıcının rolünü ve onay durumunu güncelle
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { 
+        role: 'farmer',
+        approvalStatus: 'approved'
+      },
+      { new: true }
+    );
+    
+    console.log(`[DEBUG] Kullanıcı rol ve onay durumu güncellendi - Role: ${updatedUser.role}, Status: ${updatedUser.approvalStatus}`);
+    
+    res.status(201).json({
+      success: true,
+      data: farmer,
+      message: 'Çiftçi kaydı başarıyla oluşturuldu'
+    });
+    
+  } catch (error) {
+    console.error('[DEBUG] Çiftçi kaydı oluşturma hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
+    });
+  }
+};
+
+/**
+ * @desc    Çiftçi/çiftlik bilgilerini günceller
+ * @route   PUT /api/farmers/update
+ * @access  Private (farmer)
+ */
+exports.updateFarmer = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+
+  const farmer = await Farmer.findOne({ user: userId });
+
+  if (!farmer) {
+    return res.status(404).json({
+      success: false,
+      message: 'Bu kullanıcıya ait çiftlik kaydı bulunamadı.'
+    });
+  }
+
+  // Güncellenebilir alanlar
+  const {
+    farmName,
+    description,
+    address,
+    city,
+    district,
+    taxNumber,
+    categories,
+    shippingOptions
+  } = req.body;
+
+  // Güncellenecek veriyi hazırla
+  const updateData = {};
+  
+  if (farmName) updateData.farmName = farmName;
+  if (description) updateData.description = description;
+  if (address) updateData.address = address;
+  if (city) updateData.city = city;
+  if (district) updateData.district = district;
+  if (taxNumber) updateData.taxNumber = taxNumber;
+  if (categories) updateData.categories = categories;
+  if (shippingOptions) updateData.shippingOptions = shippingOptions;
+
+  // Çiftlik verisini güncelle
+  const updatedFarmer = await Farmer.findByIdAndUpdate(
+    farmer._id,
+    updateData,
+    { new: true, runValidators: true }
+  ).populate('categories');
+
+  res.status(200).json({
+    success: true,
+    message: 'Çiftlik bilgileri başarıyla güncellendi.',
+    data: updatedFarmer
+  });
+}); 

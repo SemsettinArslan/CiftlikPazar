@@ -16,18 +16,22 @@ import FarmerRegisterPage from './pages/FarmerRegisterPage';
 import FarmerRegisterStep2Page from './pages/FarmerRegisterStep2Page';
 import FarmerRegisterCompletePage from './pages/FarmerRegisterCompletePage';
 import ProfilePage from './pages/ProfilePage';
-import FarmProfileEditPage from './pages/FarmProfileEditPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminFarmerRequestsPage from './pages/admin/AdminFarmerRequestsPage';
+import ProductsPage from './pages/ProductsPage';
+import ProductPage from './pages/ProductPage';
+import FarmerDashboardPage from './pages/farmer/FarmerDashboardPage';
+import AboutPage from './pages/AboutPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
+import FarmerRoute from './components/FarmerRoute';
 
 function App() {
   return (
     <>
       <Header />
       <main className="py-3">
-        <Container>
+        <Container fluid>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
@@ -37,15 +41,20 @@ function App() {
             <Route path="/farmer-register-complete" element={<FarmerRegisterCompletePage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password/:resetToken" element={<ResetPasswordPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/product/:id" element={<ProductPage />} />
+            <Route path="/about" element={<AboutPage />} />
             <Route path="/profile" element={
               <ProtectedRoute>
                 <ProfilePage />
               </ProtectedRoute>
             } />
-            <Route path="/farm-profile-edit" element={
-              <ProtectedRoute>
-                <FarmProfileEditPage />
-              </ProtectedRoute>
+
+            {/* Farmer Routes */}
+            <Route path="/farmer/dashboard" element={
+              <FarmerRoute>
+                <FarmerDashboardPage />
+              </FarmerRoute>
             } />
 
             {/* Admin Routes */}

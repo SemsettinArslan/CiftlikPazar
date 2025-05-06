@@ -208,6 +208,27 @@ const Header = () => {
                         </>
                       )}
                       
+                      {user.role === 'farmer' && (user.approvalStatus === 'approved') && (
+                        <>
+                          <Link 
+                            to="/farmer/dashboard" 
+                            className="dropdown-item py-2 px-3"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              transition: 'background-color 0.15s ease-in-out',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(74, 142, 58, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                          >
+                            <FaTachometerAlt className="me-2" /> 
+                            <span>Çiftlik Paneli</span>
+                          </Link>
+                          <hr className="dropdown-divider my-1" />
+                        </>
+                      )}
+                      
                       {user.role === 'farmer' && user.isApproved ? (
                         <>
                           <Link 

@@ -113,27 +113,27 @@ exports.login = async (req, res) => {
     }
 
     // Debug log - Giriş denemesi
-    console.log(`Giriş denemesi: ${email}`);
+    console.log(`[DEBUG] Giriş denemesi: ${email}`);
 
     // Veritabanından kullanıcıyı bul (şifre ile birlikte)
     const user = await User.findOne({ email }).select('+password');
 
     // Kullanıcı yoksa
     if (!user) {
-      console.log(`Kullanıcı bulunamadı: ${email}`);
+      console.log(`[DEBUG] Kullanıcı bulunamadı: ${email}`);
       return res.status(401).json({
         success: false,
         message: 'Geçersiz e-posta veya şifre'
       });
     }
 
-    // Debug log - Kullanıcı bulundu
-    console.log(`Kullanıcı bulundu: ${user.email}`);
+    // Debug log - Kullanıcı detayları
+    console.log(`[DEBUG] Kullanıcı bulundu - ID: ${user._id}, Email: ${user.email}, Role: ${user.role}, ApprovalStatus: ${user.approvalStatus}`);
 
     // Şifre kontrolü
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      console.log(`Yanlış şifre: ${email}`);
+      console.log(`[DEBUG] Yanlış şifre: ${email}`);
       return res.status(401).json({
         success: false,
         message: 'Geçersiz e-posta veya şifre'
@@ -141,11 +141,11 @@ exports.login = async (req, res) => {
     }
 
     // Debug log - Şifre doğru
-    console.log(`Şifre doğru: ${user.email}`);
+    console.log(`[DEBUG] Şifre doğru: ${user.email}`);
 
     // Hesap durumu kontrolü - Askıya alınmış veya deaktive edilmişse
     if (user.accountStatus === 'suspended' || user.accountStatus === 'deactivated') {
-      console.log(`Hesap aktif değil: ${user.email}, Durum: ${user.accountStatus}`);
+      console.log(`[DEBUG] Hesap aktif değil: ${user.email}, Durum: ${user.accountStatus}`);
       return res.status(401).json({
         success: false,
         message: 'Hesabınız şu anda aktif değil'
@@ -154,18 +154,40 @@ exports.login = async (req, res) => {
 
     // Çiftçi hesabı ve onay durumu kontrolü
     if (user.role === 'farmer') {
+      console.log(`[DEBUG] Çiftçi hesabı kontrolü - ApprovalStatus: ${user.approvalStatus}`);
+      
       if (user.approvalStatus === 'pending') {
-        console.log(`Çiftçi hesabı onay bekliyor: ${user.email}`);
+        console.log(`[DEBUG] Çiftçi hesabı onay bekliyor: ${user.email}`);
         return res.status(401).json({
           success: false,
           message: 'Çiftçi hesabınız hala inceleme aşamasında'
         });
       } else if (user.approvalStatus === 'rejected') {
-        console.log(`Çiftçi hesabı reddedildi: ${user.email}`);
+        console.log(`[DEBUG] Çiftçi hesabı reddedildi: ${user.email}`);
         return res.status(401).json({
           success: false,
           message: 'Çiftçi başvurunuz reddedildi. Lütfen destek ekibiyle iletişime geçin.'
         });
+      }
+      
+      // İlişkili çiftçi kaydı var mı kontrol et
+      try {
+        const Farmer = require('../models/farmer.model');
+        const farmerRecord = await Farmer.findOne({ user: user._id });
+        
+        console.log(`[DEBUG] Çiftçi kaydı aranıyor - User ID: ${user._id}`);
+        
+        if (!farmerRecord) {
+          console.log(`[DEBUG] Çiftçi kaydı bulunamadı! User ID: ${user._id}`);
+          return res.status(401).json({
+            success: false,
+            message: 'Çiftçi hesabınız eksik. Lütfen destek ekibiyle iletişime geçin.'
+          });
+        }
+        
+        console.log(`[DEBUG] Çiftçi kaydı bulundu - Farm ID: ${farmerRecord._id}, Farm Name: ${farmerRecord.farmName}`);
+      } catch (error) {
+        console.error(`[DEBUG] Çiftçi kaydı kontrol edilirken hata: ${error.message}`);
       }
     }
 
@@ -176,7 +198,7 @@ exports.login = async (req, res) => {
     const token = user.getSignedJwtToken();
 
     // Debug log - Başarılı giriş
-    console.log(`Başarılı giriş: ${user.email}`);
+    console.log(`[DEBUG] Başarılı giriş: ${user.email}`);
 
     // Kullanıcı bilgilerini döndür (şifre hariç)
     const userWithoutPassword = { ...user.toObject() };
@@ -188,10 +210,10 @@ exports.login = async (req, res) => {
       user: userWithoutPassword
     });
   } catch (error) {
-    console.error('Giriş hatası:', error);
+    console.error('[DEBUG] Giriş hatası:', error);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
     });
   }
 };
@@ -539,6 +561,73 @@ exports.makeAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error('Admin yapma hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
+    });
+  }
+};
+
+// @desc    Telefon numarası güncelleme
+// @route   PUT /api/auth/update-phone
+// @access  Private
+exports.updatePhone = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { phoneNumber } = req.body;
+
+    // Telefon numarası zorunlu
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lütfen telefon numarası giriniz'
+      });
+    }
+
+    // Telefon numarası formatını kontrol et (sadece rakamlardan oluşmalı)
+    if (!/^\d{10,11}$/.test(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Geçerli bir telefon numarası giriniz (10-11 rakam)'
+      });
+    }
+
+    // Telefon numarası başka bir kullanıcıda var mı kontrol et (kendisi hariç)
+    const existingPhone = await User.findOne({ 
+      phone: phoneNumber, 
+      _id: { $ne: userId } 
+    });
+
+    if (existingPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor'
+      });
+    }
+
+    // Kullanıcıyı bul ve güncelle
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { phone: phoneNumber },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Telefon numarası başarıyla güncellendi',
+      data: {
+        phone: updatedUser.phone
+      }
+    });
+  } catch (error) {
+    console.error('Telefon güncelleme hatası:', error);
     res.status(500).json({
       success: false,
       message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
