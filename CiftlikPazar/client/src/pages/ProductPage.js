@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Row, Col, Image, ListGroup, Card, Button, Container, Badge, Form } from 'react-bootstrap';
 import axios from 'axios';
+import { useCart } from '../context/CartContext';
+import { toast } from 'react-toastify';
+import { FaShoppingCart, FaPlus, FaMinus, FaTag, FaStore, FaInfoCircle, FaMapMarkerAlt, FaArrowLeft } from 'react-icons/fa';
+import { getCategoryNameById } from '../utils/categoryUtils';
 
 const ProductPage = () => {
   const { id } = useParams();
@@ -9,6 +13,8 @@ const ProductPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
+  const [categoryName, setCategoryName] = useState('');
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -16,6 +22,13 @@ const ProductPage = () => {
         setLoading(true);
         const { data } = await axios.get(`/api/products/${id}`);
         setProduct(data);
+        
+        // Kategori ismini getir
+        if (data.category) {
+          const name = await getCategoryNameById(data.category);
+          setCategoryName(name);
+        }
+        
         setLoading(false);
       } catch (err) {
         setError(err.response?.data?.message || 'Ürün yüklenirken bir hata oluştu');
@@ -27,8 +40,33 @@ const ProductPage = () => {
   }, [id]);
 
   const addToCartHandler = () => {
-    // Sepete ekleme fonksiyonu (ileride implementasyon yapılacak)
-    console.log('Sepete eklendi', id, quantity);
+    if (!product) return;
+    
+    // Stok kontrolü (maksimum eklenen miktar ürünün stok miktarını geçemez)
+    const maxQuantity = Math.min(quantity, product.countInStock);
+    
+    // Sepete ekleme işleminin başarılı olup olmadığını tutan değişken
+    let allAdded = true;
+    
+    // Quantity değerini dikkate alarak ürünü sepete ekle
+    for (let i = 0; i < maxQuantity; i++) {
+      // addToCart false dönerse bir sorun var demektir
+      const success = addToCart(product);
+      if (!success) {
+        allAdded = false;
+        break;
+      }
+    }
+    
+    // Eğer başarıyla eklendiyse toast bildirimi göster
+    if (allAdded && maxQuantity > 0) {
+      toast.success(
+        <div className="d-flex align-items-center">
+          <FaShoppingCart className="me-2" />
+          <span>{maxQuantity} adet {product.name} sepete eklendi!</span>
+        </div>
+      );
+    }
   };
 
   if (loading) return (
@@ -57,7 +95,7 @@ const ProductPage = () => {
     <Container className="py-5">
       <div className="d-flex align-items-center mb-4">
         <Link to="/products" className="btn btn-success rounded-pill me-3 d-flex align-items-center justify-content-center">
-          <i className="fas fa-arrow-left me-2"></i>
+          <FaArrowLeft className="me-2" />
           Ürünlere Dön
         </Link>
         <nav aria-label="breadcrumb">
@@ -89,10 +127,27 @@ const ProductPage = () => {
           <Col lg={6}>
             <div className="p-4 p-lg-5">
               <h2 className="fw-bold mb-2">{product.name}</h2>
-              <Link to={`/farmer/${product.farmer._id}`} className="text-decoration-none text-muted d-inline-block mb-3">
-                <i className="fas fa-store me-2"></i>
+              <Link to={`/producer/${product.farmer._id}`} className="text-decoration-none text-muted d-inline-block mb-3">
+                <FaStore className="me-2" />
                 {product.farmer.farmName}
               </Link>
+              
+              {/* Kategori bilgisi */}
+              {(product.category || categoryName) && (
+                <div className="mb-3">
+                  <Badge 
+                    bg="light" 
+                    text="dark" 
+                    className="border me-1 py-2 px-3"
+                  >
+                    <FaTag className="me-1" />
+                    {categoryName || 
+                      (typeof product.category === 'object' 
+                        ? (product.category.category_name || product.category.name || 'Kategori') 
+                        : 'Kategori')}
+                  </Badge>
+                </div>
+              )}
               
               <div className="my-4">
                 <h3 className="text-success fw-bold mb-0">
@@ -126,7 +181,7 @@ const ProductPage = () => {
                       className="border-0 btn-sm py-2 px-3"
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     >
-                      <i className="fas fa-minus"></i>
+                      <FaMinus />
                     </Button>
                     <Form.Control
                       type="number"
@@ -142,18 +197,17 @@ const ProductPage = () => {
                       className="border-0 btn-sm py-2 px-3"
                       onClick={() => setQuantity(Math.min(product.countInStock, quantity + 1))}
                     >
-                      <i className="fas fa-plus"></i>
+                      <FaPlus />
                     </Button>
                   </div>
                   <div className="flex-grow-1">
                     <Button 
-                      variant="success" 
+                      variant="outline-success" 
                       className="w-100 py-2 rounded-pill"
                       disabled={product.countInStock === 0}
                       onClick={addToCartHandler}
                     >
-                      <i className="fas fa-shopping-cart me-2"></i>
-                      Sepete Ekle
+                      <FaShoppingCart className="me-2" /> Sepete Ekle
                     </Button>
                   </div>
                 </div>
@@ -168,24 +222,46 @@ const ProductPage = () => {
           <Card className="border-0 shadow-sm rounded-3 overflow-hidden">
             <Card.Header className="bg-success text-white py-3 px-4">
               <h5 className="mb-0">
-                <i className="fas fa-info-circle me-2"></i>
+                <FaInfoCircle className="me-2" />
                 Üretici Hakkında
               </h5>
             </Card.Header>
             <Card.Body className="p-4">
               <Card.Title className="fs-4 mb-3">{product.farmer.farmName}</Card.Title>
               <Card.Text className="mb-3">
-                <i className="fas fa-map-marker-alt me-2 text-success"></i>
+                <FaMapMarkerAlt className="me-2 text-success" />
                 <strong>Konum:</strong> {product.farmer.city || 'Belirtilmemiş'}
                 {product.farmer.district ? `, ${product.farmer.district}` : ''}
               </Card.Text>
-              <Card.Text>
+              <Card.Text className="mb-4">
                 {product.farmer.description || 'Üretici hakkında açıklama bulunmamaktadır.'}
               </Card.Text>
+              
+              <Link to={`/producer/${product.farmer._id}`}>
+                <Button variant="outline-success" className="px-4 rounded-pill">
+                  <FaStore className="me-2" />
+                  Çiftlik Profiline Git
+                </Button>
+              </Link>
             </Card.Body>
           </Card>
         </Col>
       </Row>
+
+      {/* Hide number input arrows */}
+      <style jsx="true">{`
+        /* Chrome, Safari, Edge, Opera */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        
+        /* Firefox */
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
     </Container>
   );
 };

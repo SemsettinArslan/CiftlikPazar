@@ -13,7 +13,8 @@ const {
   deleteCertificate,
   verifyCertificate,
   createFarmerRecordForExistingUser,
-  updateFarmer
+  updateFarmer,
+  getPublicFarmers
 } = require('../controllers/farmer.controller');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -21,6 +22,7 @@ const router = express.Router();
 
 // Public çiftçi rotaları - Aktif olarak kullanılan
 router.post('/complete-registration', completeRegistration);
+router.get('/public', getPublicFarmers);
 
 // Eski kayıt rotaları - Artık kullanılmıyor
 // router.post('/public', registerFarmerPublic);

@@ -6,6 +6,9 @@ import { Container } from 'react-bootstrap';
 import Header from './components/Header';
 import Footer from './components/Footer';
 
+// Context
+import { CartProvider } from './context/CartContext';
+
 // Pages
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -22,13 +25,17 @@ import ProductsPage from './pages/ProductsPage';
 import ProductPage from './pages/ProductPage';
 import FarmerDashboardPage from './pages/farmer/FarmerDashboardPage';
 import AboutPage from './pages/AboutPage';
+import ProducersPage from './pages/ProducersPage';
+import ProducerDetailPage from './pages/ProducerDetailPage';
+import CartPage from './pages/CartPage';
+import ContactPage from './pages/ContactPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import FarmerRoute from './components/FarmerRoute';
 
 function App() {
   return (
-    <>
+    <CartProvider>
       <Header />
       <main className="py-3">
         <Container fluid>
@@ -43,7 +50,11 @@ function App() {
             <Route path="/reset-password/:resetToken" element={<ResetPasswordPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/product/:id" element={<ProductPage />} />
+            <Route path="/producers" element={<ProducersPage />} />
+            <Route path="/producer/:id" element={<ProducerDetailPage />} />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/cart" element={<CartPage />} />
             <Route path="/profile" element={
               <ProtectedRoute>
                 <ProfilePage />
@@ -72,7 +83,7 @@ function App() {
         </Container>
       </main>
       <Footer />
-    </>
+    </CartProvider>
   );
 }
 

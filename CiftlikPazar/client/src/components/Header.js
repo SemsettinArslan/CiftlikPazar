@@ -1,7 +1,8 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
-import { Navbar, Nav, Container, NavDropdown, Button, Image, Dropdown } from 'react-bootstrap';
+import { Navbar, Nav, Container, NavDropdown, Button, Image, Dropdown, Badge } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { 
   FaShoppingCart, FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, 
   FaLeaf, FaStore, FaUsers, FaInfoCircle, FaChevronDown, 
@@ -12,6 +13,7 @@ const BASE_URL = 'http://localhost:5000';
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
+  const { getCartItemCount } = useCart();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
@@ -145,9 +147,24 @@ const Header = () => {
                 as={Link} 
                 to="/cart" 
                 style={navLinkStyle}
-                className="d-flex align-items-center"
+                className="d-flex align-items-center position-relative"
               >
-                <FaShoppingCart className="me-2" /> Sepet
+                <FaShoppingCart className="me-2" /> 
+                <span>Sepet</span>
+                {getCartItemCount() > 0 && (
+                  <Badge 
+                    pill 
+                    bg="success" 
+                    className="position-absolute"
+                    style={{ 
+                      top: '0', 
+                      right: '0',
+                      transform: 'translate(25%, -25%)'
+                    }}
+                  >
+                    {getCartItemCount()}
+                  </Badge>
+                )}
               </Nav.Link>
               
               {user ? (

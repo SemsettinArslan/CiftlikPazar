@@ -6,7 +6,13 @@ const productController = require('../controllers/product.controller');
 // Tüm ürünleri getir
 router.get('/', productController.getProducts);
 
-// Ürün detayını getir
+// Öne çıkan ürünleri getir
+router.get('/featured', productController.getFeaturedProducts);
+
+// Belirli bir çiftçiye ait ürünleri getir
+router.get('/farmer/:farmerId', productController.getProductsByFarmer);
+
+// Ürün detayını getir - EN SON tanımlanmalı (yakalayıcı route)
 router.get('/:id', productController.getProductById);
 
 // Yeni ürün ekle (sadece çiftçiler)

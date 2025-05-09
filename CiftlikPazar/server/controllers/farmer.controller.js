@@ -1344,4 +1344,36 @@ exports.updateFarmer = asyncHandler(async (req, res) => {
     message: 'Çiftlik bilgileri başarıyla güncellendi.',
     data: updatedFarmer
   });
-}); 
+});
+
+// @desc    Halka açık çiftlikleri listeleme için (onaylanmış çiftçiler)
+// @route   GET /api/farmers/public
+// @access  Public
+exports.getPublicFarmers = async (req, res) => {
+  try {
+    // Sadece onaylanmış çiftçileri getir
+    const approvedFarmers = await Farmer.find()
+      .populate({
+        path: 'user',
+        select: 'firstName lastName profileImage',
+        match: { approvalStatus: 'approved', role: 'farmer' }
+      })
+      .populate('categories', 'name')
+      .sort({ createdAt: -1 });
+
+    // Kullanıcısı onaylanmış olan çiftçileri filtrele
+    const filteredFarmers = approvedFarmers.filter(farmer => farmer.user !== null);
+
+    res.status(200).json({
+      success: true,
+      count: filteredFarmers.length,
+      data: filteredFarmers
+    });
+  } catch (error) {
+    console.error('Halka açık çiftçi listesi getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
+    });
+  }
+}; 

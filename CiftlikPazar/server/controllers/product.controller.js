@@ -143,4 +143,67 @@ exports.deleteProduct = async (req, res) => {
     console.error(error);
     res.status(500).json({ message: 'Sunucu hatası' });
   }
+};
+
+// Öne çıkan ürünleri getir
+exports.getFeaturedProducts = async (req, res) => {
+  try {
+    // Limit parametresi, kaç ürün döndürüleceğini belirler (varsayılan 4)
+    const limit = parseInt(req.query.limit) || 4;
+
+    const featuredProducts = await Product.find({ isFeatured: true })
+      .limit(limit)
+      .populate({
+        path: 'farmer',
+        select: 'farmName city district description'
+      })
+      .populate('category', 'name');
+    
+    res.status(200).json({
+      success: true,
+      count: featuredProducts.length,
+      data: featuredProducts
+    });
+  } catch (error) {
+    console.error('Öne çıkan ürünleri getirme hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
+};
+
+// Belirli bir çiftçiye ait ürünleri getir
+exports.getProductsByFarmer = async (req, res) => {
+  try {
+    const farmerId = req.params.farmerId;
+    
+    // Çiftçi kontrolü
+    const farmerExists = await Farmer.findById(farmerId);
+    if (!farmerExists) {
+      return res.status(404).json({
+        success: false,
+        message: 'Üretici bulunamadı'
+      });
+    }
+    
+    const products = await Product.find({ farmer: farmerId })
+      .populate({
+        path: 'farmer',
+        select: 'farmName city district description'
+      })
+      .populate('category', 'name');
+    
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products
+    });
+  } catch (error) {
+    console.error('Çiftçi ürünlerini getirme hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
 }; 
