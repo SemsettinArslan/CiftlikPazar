@@ -14,17 +14,14 @@ const {
 const Product = require('../models/Product');
 const advancedResults = require('../middleware/advancedResults');
 const { protect, authorize } = require('../middleware/auth');
-const { uploadMultiple, uploadErrorHandler } = require('../middleware/upload');
+const { uploadSingle, uploadErrorHandler } = require('../middleware/upload');
 
 const router = express.Router();
 
 // Ürün değerlendirme route'ları
 router
   .route('/:id/ratings')
-  .post(protect, addProductRating);
-
-router
-  .route('/:id/ratings/:ratingId')
+  .post(protect, addProductRating)
   .put(protect, updateProductRating)
   .delete(protect, deleteProductRating);
 
@@ -33,8 +30,8 @@ router
   .route('/:id/image')
   .put(
     protect, 
-    authorize('seller', 'admin'),
-    uploadMultiple('images'),
+    authorize('farmer', 'admin'),
+    uploadSingle('image'),
     uploadErrorHandler,
     productImageUpload
   );
@@ -45,16 +42,16 @@ router
   .get(
     advancedResults(Product, [
       { path: 'category', select: 'name slug' },
-      { path: 'seller', select: 'name' }
+      { path: 'farmer', select: 'name farmName' }
     ]),
     getProducts
   )
-  .post(protect, authorize('seller', 'admin'), createProduct);
+  .post(protect, authorize('farmer', 'admin'), createProduct);
 
 router
   .route('/:id')
   .get(getProduct)
-  .put(protect, authorize('seller', 'admin'), updateProduct)
-  .delete(protect, authorize('seller', 'admin'), deleteProduct);
+  .put(protect, authorize('farmer', 'admin'), updateProduct)
+  .delete(protect, authorize('farmer', 'admin'), deleteProduct);
 
 module.exports = router; 

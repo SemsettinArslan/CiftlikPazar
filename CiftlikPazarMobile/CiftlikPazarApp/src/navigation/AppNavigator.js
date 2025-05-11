@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
-import ProfileScreen from '../screens/ProfileScreen';
 import ProductsScreen from '../screens/ProductsScreen';
 
 // Context
@@ -36,8 +35,6 @@ const MainTabNavigator = () => (
           iconName = focused ? 'home' : 'home-outline';
         } else if (route.name === 'Products') {
           iconName = focused ? 'list' : 'list-outline';
-        } else if (route.name === 'Profile') {
-          iconName = focused ? 'person' : 'person-outline';
         }
 
         return <Ionicons name={iconName} size={size} color={color} />;
@@ -48,7 +45,6 @@ const MainTabNavigator = () => (
   >
     <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Ana Sayfa' }} />
     <Tab.Screen name="Products" component={ProductsScreen} options={{ title: 'Ürünler' }} />
-    <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profil' }} />
   </Tab.Navigator>
 );
 

@@ -24,10 +24,10 @@ router.use(protect);
 router.get('/myorders', getMyOrders);
 
 // Satıcı siparişleri
-router.get('/sellerorders', authorize('seller', 'admin'), getSellerOrders);
+router.get('/sellerorders', authorize('farmer', 'admin'), getSellerOrders);
 
 // Sipariş durumu güncelleme
-router.put('/:id/status', authorize('seller', 'admin'), updateOrderStatus);
+router.put('/:id/status', authorize('farmer', 'admin'), updateOrderStatus);
 
 // Sipariş ödeme durumu güncelleme
 router.put('/:id/pay', authorize('admin'), updateOrderPayment);
@@ -36,7 +36,7 @@ router.put('/:id/pay', authorize('admin'), updateOrderPayment);
 router.put('/:id/note', updateOrderNote);
 
 // Satıcı notu güncelleme
-router.put('/:id/sellernote', authorize('seller', 'admin'), updateSellerNote);
+router.put('/:id/sellernote', authorize('farmer', 'admin'), updateSellerNote);
 
 // Sipariş route'ları
 router

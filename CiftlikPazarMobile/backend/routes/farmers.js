@@ -10,7 +10,8 @@ const {
   addCertificate,
   getCertificates,
   deleteCertificate,
-  verifyCertificate
+  verifyCertificate,
+  updateFarm
 } = require('../controllers/farmers');
 const { protect, authorize } = require('../middleware/auth');
 const { uploadSingle, uploadErrorHandler } = require('../middleware/upload');
@@ -23,6 +24,10 @@ router.post('/complete-registration', completeRegistration);
 // Çiftçi profili rotaları
 router.route('/me')
   .get(protect, authorize('farmer'), getMyFarm);
+
+// Çiftçi profil güncelleme
+router.route('/update-profile')
+  .put(protect, authorize('farmer'), updateFarm);
 
 // Admin rotaları - ÖNEMLİ: Spesifik rotalar /:id gibi genel rotalardan ÖNCE gelmeli
 router.route('/pending')

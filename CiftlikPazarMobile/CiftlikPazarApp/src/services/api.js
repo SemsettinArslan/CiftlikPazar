@@ -1,17 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { getApiBaseUrl } from '../utils/networkUtils';
 
-// API URL - Platformlara göre URL'leri ayarla
-const getApiUrl = () => {
-  // Android emülatörde localhost yerine 10.0.2.2 kullanılır
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api'; // Android için localhost
-  } else {
-    return 'http://localhost:5000/api'; // iOS için localhost
-  }
-};
-
-const API_URL = getApiUrl();
+// API URL - Dinamik olarak server IP'sini alıyoruz
+const API_URL = getApiBaseUrl();
 
 // Token ile istek gönderme yardımcı fonksiyonu
 const fetchWithToken = async (endpoint, options = {}) => {
@@ -20,13 +12,16 @@ const fetchWithToken = async (endpoint, options = {}) => {
     const user = userData ? JSON.parse(userData) : null;
     const token = user ? user.token : null;
 
+    // Her istekte güncel API URL'ini al - IP değişikliklerini yakalamak için
+    const currentApiUrl = getApiBaseUrl();
+
     const headers = {
       'Content-Type': 'application/json',
       ...(token && { 'Authorization': `Bearer ${token}` }),
       ...options.headers,
     };
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
+    const response = await fetch(`${currentApiUrl}${endpoint}`, {
       ...options,
       headers,
     });
@@ -122,9 +117,9 @@ export const categoryAPI = {
   // Tüm kategorileri getir
   getAllCategories: async () => {
     try {
-      console.log('Kategoriler getiriliyor:', `${API_URL}/categories`);
+      console.log('Kategoriler getiriliyor:', `${API_URL}/categories?limit=100`);
       
-      const response = await fetch(`${API_URL}/categories`, {
+      const response = await fetch(`${API_URL}/categories?limit=100`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -132,51 +127,84 @@ export const categoryAPI = {
         }
       });
 
-      // Sunucu yanıtını kontrol et
-      if (!response.ok) {
-        console.error('Kategori API hatası:', response.status, response.statusText);
+      // Önce tam yanıtı text olarak al ve logla
+      const responseText = await response.text();
+      console.log('Ham kategori API yanıtı:', responseText);
+      
+      // Yanıt boşsa veya geçersizse
+      if (!responseText || responseText.trim() === '') {
+        console.error('Kategori API boş yanıt döndü');
         return {
           success: false,
-          message: `Kategori API hatası: ${response.status} ${response.statusText}`,
+          message: 'API boş yanıt döndü',
           data: getDefaultCategories()
         };
       }
       
-      const data = await response.json();
-      
-      // API yanıt formatını kontrol et
-      if (data.success && Array.isArray(data.data)) {
-        // Web API formatında yanıt
-        console.log(`${data.data.length} kategori başarıyla yüklendi`);
+      try {
+        // JSON parse et
+        const data = JSON.parse(responseText);
+        console.log('Ayrıştırılmış kategori API yanıtı:', data);
         
-        // Web formatlı kategori verisini dön
+        // API yanıt formatını kontrol et
+        if (data.success && Array.isArray(data.data)) {
+          // Web API formatında yanıt (standart)
+          console.log(`${data.data.length} kategori başarıyla yüklendi`);
+          return {
+            success: true,
+            message: 'Kategoriler başarıyla yüklendi',
+            data: data.data
+          };
+        } 
+        else if (Array.isArray(data)) {
+          // Doğrudan dizi olarak yanıt
+          console.log(`${data.length} kategori başarıyla yüklendi (dizi)`);
+          return {
+            success: true,
+            message: 'Kategoriler başarıyla yüklendi',
+            data: data
+          };
+        }
+        else if (data.data && Array.isArray(data.data.data)) {
+          // İç içe data yapısı
+          console.log(`${data.data.data.length} kategori başarıyla yüklendi (iç içe)`);
+          return {
+            success: true,
+            message: 'Kategoriler başarıyla yüklendi',
+            data: data.data.data
+          };
+        }
+        else if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+          // Data bir object ise (pagination durumu)
+          if (data.data.docs && Array.isArray(data.data.docs)) {
+            console.log(`${data.data.docs.length} kategori başarıyla yüklendi (pagination)`);
+            return {
+              success: true,
+              message: 'Kategoriler başarıyla yüklendi',
+              data: data.data.docs
+            };
+          }
+        }
+        
+        // Hiçbir format eşleşmezse
+        console.warn('Beklenmeyen API yanıt formatı, veritabanından kategori çekilemedi:', data);
         return {
           success: true,
-          message: 'Kategoriler başarıyla yüklendi',
-          data: data.data
+          message: 'Kategoriler veritabanından çekilemedi, varsayılan veriler kullanılıyor',
+          data: getDefaultCategories(),
+          isDefault: true
         };
-      } 
-      else if (Array.isArray(data)) {
-        // Doğrudan dizi olarak yanıt
-        console.log(`${data.length} kategori başarıyla yüklendi (dizi)`);
+      } catch (jsonError) {
+        console.error('JSON parse hatası, veritabanından kategori çekilemedi:', jsonError);
         return {
-          success: true,
-          message: 'Kategoriler başarıyla yüklendi',
-          data: data
-        };
-      } 
-      else {
-        // API yanıt formatı beklenenden farklı, varsayılan verileri kullan
-        console.warn('Beklenmeyen API yanıt formatı, varsayılan kategoriler kullanılıyor');
-        return {
-          success: true,
-          message: 'Beklenmeyen API yanıt formatı, varsayılan kategoriler kullanılıyor',
+          success: false,
+          message: 'JSON parse hatası',
           data: getDefaultCategories(),
           isDefault: true
         };
       }
     } catch (error) {
-      console.error('Kategori yükleme hatası:', error);
+      console.error('Kategori yükleme hatası, veritabanından kategori çekilemedi:', error);
       
       // Hata durumunda varsayılan kategorileri döndür
       return {
@@ -407,89 +435,65 @@ function getDefaultCategories() {
   return [
     { 
       _id: '1', 
-      category_name: 'Sebze', 
-      subcategory: [
-        { name: 'Domates', slug: 'domates' },
-        { name: 'Biber', slug: 'biber' },
-        { name: 'Patlıcan', slug: 'patlican' }
-      ],
+      name: 'Sebze', 
+      category_name: 'Sebze',
+      slug: 'sebze',
       description: 'Taze sebzeler',
       isActive: true
     },
     { 
       _id: '2', 
-      category_name: 'Meyve', 
-      subcategory: [
-        { name: 'Elma', slug: 'elma' },
-        { name: 'Armut', slug: 'armut' },
-        { name: 'Çilek', slug: 'cilek' }
-      ],
+      name: 'Meyve', 
+      category_name: 'Meyve',
+      slug: 'meyve',
       description: 'Taze meyveler',
       isActive: true
     },
     { 
       _id: '3', 
-      category_name: 'Tahıl', 
-      subcategory: [
-        { name: 'Buğday', slug: 'bugday' },
-        { name: 'Arpa', slug: 'arpa' },
-        { name: 'Çavdar', slug: 'cavdar' }
-      ],
+      name: 'Tahıl', 
+      category_name: 'Tahıl',
+      slug: 'tahil',
       description: 'Tahıl ürünleri',
       isActive: true
     },
     { 
       _id: '4', 
-      category_name: 'Süt Ürünleri', 
-      subcategory: [
-        { name: 'Peynir', slug: 'peynir' },
-        { name: 'Yoğurt', slug: 'yogurt' },
-        { name: 'Tereyağı', slug: 'tereyagi' }
-      ],
+      name: 'Süt Ürünleri', 
+      category_name: 'Süt Ürünleri',
+      slug: 'sut-urunleri',
       description: 'Organik süt ürünleri',
       isActive: true
     },
     { 
       _id: '5', 
-      category_name: 'Et Ürünleri', 
-      subcategory: [
-        { name: 'Dana Eti', slug: 'dana-eti' },
-        { name: 'Tavuk', slug: 'tavuk' },
-        { name: 'Kuzu Eti', slug: 'kuzu-eti' }
-      ],
+      name: 'Et Ürünleri', 
+      category_name: 'Et Ürünleri',
+      slug: 'et-urunleri',
       description: 'Doğal beslenmiş hayvanlardan et ürünleri',
       isActive: true
     },
     { 
       _id: '6', 
-      category_name: 'Bal ve Arıcılık', 
-      subcategory: [
-        { name: 'Çiçek Balı', slug: 'cicek-bali' },
-        { name: 'Polen', slug: 'polen' },
-        { name: 'Propolis', slug: 'propolis' }
-      ],
+      name: 'Bal ve Arıcılık', 
+      category_name: 'Bal ve Arıcılık',
+      slug: 'bal-aricilik',
       description: 'Arıcılık ürünleri',
       isActive: true
     },
     { 
       _id: '7', 
-      category_name: 'Organik Tarım', 
-      subcategory: [
-        { name: 'Organik Sebze', slug: 'organik-sebze' },
-        { name: 'Organik Meyve', slug: 'organik-meyve' },
-        { name: 'Organik Bakliyat', slug: 'organik-bakliyat' }
-      ],
+      name: 'Organik Tarım', 
+      category_name: 'Organik Tarım',
+      slug: 'organik-tarim',
       description: 'Organik sertifikalı ürünler',
       isActive: true
     },
     { 
       _id: '8', 
-      category_name: 'Kuru Gıda', 
-      subcategory: [
-        { name: 'Bakliyat', slug: 'bakliyat' },
-        { name: 'Kuruyemiş', slug: 'kuruyemis' },
-        { name: 'Kuru Meyve', slug: 'kuru-meyve' }
-      ],
+      name: 'Kuru Gıda', 
+      category_name: 'Kuru Gıda',
+      slug: 'kuru-gida',
       description: 'Kuru gıda ürünleri',
       isActive: true
     }

@@ -29,7 +29,7 @@ exports.getMyOrders = asyncHandler(async (req, res, next) => {
 // @access  Private (Satıcı)
 exports.getSellerOrders = asyncHandler(async (req, res, next) => {
   // Satıcının ürünlerini bul
-  const products = await Product.find({ seller: req.user.id }).select('_id');
+  const products = await Product.find({ farmer: req.user.id }).select('_id');
   const productIds = products.map(product => product._id);
 
   // Satıcının ürünlerini içeren siparişleri bul
@@ -61,7 +61,7 @@ exports.getOrder = asyncHandler(async (req, res, next) => {
   if (order.user._id.toString() !== req.user.id && req.user.role !== 'admin') {
     // Satıcı ise, kendi ürünlerini içeren sipariş mi kontrol et
     if (req.user.role === 'seller') {
-      const products = await Product.find({ seller: req.user.id }).select('_id');
+      const products = await Product.find({ farmer: req.user.id }).select('_id');
       const productIds = products.map(product => product._id.toString());
       
       const hasSellerProduct = order.items.some(item => 
@@ -164,7 +164,7 @@ exports.updateOrderStatus = asyncHandler(async (req, res, next) => {
 
   // Admin değilse, satıcının kendi ürünlerini içeren sipariş mi kontrol et
   if (req.user.role !== 'admin') {
-    const products = await Product.find({ seller: req.user.id }).select('_id');
+    const products = await Product.find({ farmer: req.user.id }).select('_id');
     const productIds = products.map(product => product._id.toString());
     
     const hasSellerProduct = order.items.some(item => 
@@ -275,7 +275,7 @@ exports.updateSellerNote = asyncHandler(async (req, res, next) => {
 
   // Admin değilse, satıcının kendi ürünlerini içeren sipariş mi kontrol et
   if (req.user.role !== 'admin') {
-    const products = await Product.find({ seller: req.user.id }).select('_id');
+    const products = await Product.find({ farmer: req.user.id }).select('_id');
     const productIds = products.map(product => product._id.toString());
     
     const hasSellerProduct = order.items.some(item => 

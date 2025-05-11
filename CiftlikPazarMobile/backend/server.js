@@ -39,7 +39,7 @@ app.use(cors({
 app.use(fileUpload());
 
 // Statik dosyalar
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../..', 'uploads')));
 
 // API route'ları
 app.use('/api/auth', auth);

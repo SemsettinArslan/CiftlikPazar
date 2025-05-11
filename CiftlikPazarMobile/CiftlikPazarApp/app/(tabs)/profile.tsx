@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 
 // ProfileMenuItem için prop tipleri
 interface ProfileMenuItemProps {
@@ -21,8 +21,15 @@ interface ProfileMenuItemProps {
 }
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUserData } = useAuth();
   const router = useRouter();
+
+  // Her sayfa odaklandığında kullanıcı bilgilerini yenile
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshUserData();
+    }, [])
+  );
 
   const handleLogout = () => {
     Alert.alert(
@@ -40,12 +47,6 @@ export default function ProfileScreen() {
         }
       ]
     );
-  };
-
-  // Profil düzenleme sayfasına yönlendir
-  const goToEditProfile = () => {
-    console.log('Profil düzenleme sayfasına yönlendiriliyor...');
-    router.push('/edit-profile');
   };
 
   // Profil menü öğesi
@@ -77,12 +78,8 @@ export default function ProfileScreen() {
           </View>
         </View>
         
-        <Text style={styles.userName}>{user?.name || 'Kullanıcı'}</Text>
-        <Text style={styles.userEmail}>{user?.email || 'kullanici@ornek.com'}</Text>
-        
-        <TouchableOpacity style={styles.editButton} onPress={goToEditProfile}>
-          <Text style={styles.editButtonText}>Profili Düzenle</Text>
-        </TouchableOpacity>
+        <Text style={styles.userName}>{user?.data?.firstName} {user?.data?.lastName || 'Kullanıcı'}</Text>
+        <Text style={styles.userEmail}>{user?.data?.email || 'kullanici@ornek.com'}</Text>
       </View>
 
       {/* Profil Bilgileri */}
@@ -135,13 +132,13 @@ export default function ProfileScreen() {
         <ProfileMenuItem 
           icon="person-outline" 
           title="Kişisel Bilgiler" 
-          onPress={() => {}} 
+          onPress={() => router.push('/personal-info')} 
         />
         
         <ProfileMenuItem 
           icon="home-outline" 
           title="Adreslerim" 
-          onPress={() => {}} 
+          onPress={() => router.push('/addresses')} 
         />
         
         <ProfileMenuItem 
@@ -237,17 +234,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 15,
-  },
-  editButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-  },
-  editButtonText: {
-    color: '#4CAF50',
-    fontWeight: '600',
-    fontSize: 14,
   },
   infoContainer: {
     flexDirection: 'row',

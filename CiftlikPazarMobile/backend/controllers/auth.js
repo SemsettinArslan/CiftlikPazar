@@ -244,23 +244,23 @@ exports.addAddress = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user.id);
 
   // Eğer ilk adres ise varsayılan yap
-  if (user.addresses.length === 0) {
+  if (user.deliveryAddresses.length === 0) {
     req.body.isDefault = true;
   }
 
   // Yeni eklenecek adres varsayılan olarak işaretlenmişse, diğer adreslerin varsayılan durumunu kaldır
   if (req.body.isDefault) {
-    user.addresses.forEach(address => {
+    user.deliveryAddresses.forEach(address => {
       address.isDefault = false;
     });
   }
 
-  user.addresses.push(req.body);
+  user.deliveryAddresses.push(req.body);
   await user.save();
 
   res.status(201).json({
     success: true,
-    data: user.addresses
+    data: user.deliveryAddresses
   });
 });
 
@@ -271,7 +271,7 @@ exports.updateAddress = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user.id);
 
   // Adresi bul
-  const address = user.addresses.id(req.params.id);
+  const address = user.deliveryAddresses.id(req.params.id);
 
   if (!address) {
     return next(new ErrorResponse('Adres bulunamadı', 404));
@@ -279,7 +279,7 @@ exports.updateAddress = asyncHandler(async (req, res, next) => {
 
   // Yeni gönderilen adres varsayılan olarak işaretlenmişse, diğer adreslerin varsayılan durumunu kaldır
   if (req.body.isDefault) {
-    user.addresses.forEach(addr => {
+    user.deliveryAddresses.forEach(addr => {
       addr.isDefault = false;
     });
   }
@@ -293,7 +293,7 @@ exports.updateAddress = asyncHandler(async (req, res, next) => {
 
   res.status(200).json({
     success: true,
-    data: user.addresses
+    data: user.deliveryAddresses
   });
 });
 
@@ -304,7 +304,7 @@ exports.deleteAddress = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user.id);
 
   // Adresi bul
-  const address = user.addresses.id(req.params.id);
+  const address = user.deliveryAddresses.id(req.params.id);
 
   if (!address) {
     return next(new ErrorResponse('Adres bulunamadı', 404));
@@ -315,13 +315,13 @@ exports.deleteAddress = asyncHandler(async (req, res, next) => {
     return next(new ErrorResponse('Varsayılan adres silinemez. Önce başka bir adresi varsayılan yapın.', 400));
   }
 
-  // Adresi sil
-  address.remove();
+  // Adresi sil - remove() yerine pull kullan
+  user.deliveryAddresses.pull({ _id: req.params.id });
   await user.save();
 
   res.status(200).json({
     success: true,
-    data: user.addresses
+    data: user.deliveryAddresses
   });
 });
 
@@ -525,6 +525,66 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   await user.save();
 
   sendTokenResponse(user, 200, res);
+});
+
+// @desc    Kullanıcı profil bilgilerini güncelle
+// @route   PUT /api/auth/profile
+// @access  Private
+exports.updateProfile = asyncHandler(async (req, res, next) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      phone,
+      city,
+      district
+    } = req.body;
+    
+    // Güncellenecek alanları topla
+    const fieldsToUpdate = {};
+    if (firstName) fieldsToUpdate.firstName = firstName;
+    if (lastName) fieldsToUpdate.lastName = lastName;
+    if (phone) fieldsToUpdate.phone = phone;
+    if (city) fieldsToUpdate.city = city;
+    if (district) fieldsToUpdate.district = district;
+    
+    // Telefon numarası kontrolü
+    if (phone) {
+      const phoneExists = await User.findOne({ phone, _id: { $ne: req.user.id } });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu telefon numarası zaten başka bir kullanıcı tarafından kullanılıyor'
+        });
+      }
+    }
+    
+    // Kullanıcıyı güncelle
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      fieldsToUpdate,
+      { new: true, runValidators: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: user,
+      message: 'Profil başarıyla güncellendi'
+    });
+  } catch (error) {
+    console.error('Profil güncelleme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
+    });
+  }
 });
 
 // Token oluştur ve cookie ile gönder

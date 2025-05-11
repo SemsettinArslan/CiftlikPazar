@@ -468,7 +468,7 @@ const FarmerRegisterStep2Screen = () => {
                 <Picker.Item 
                   key={index} 
                   label={city.name || city.il_adi || city.city || 'İsimsiz İl'} 
-                  value={city._id || city.cityid || city.name || city.city} 
+                  value={city.name || city.il_adi || city.city || city._id} 
                 />
               ))}
             </Picker>

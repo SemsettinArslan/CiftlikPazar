@@ -89,7 +89,7 @@ export default function HomeScreen() {
       <View style={styles.welcomeContainer}>
         <View>
           <Text style={styles.welcomeText}>Merhaba,</Text>
-          <Text style={styles.userName}>{user?.name || 'Ziyaretçi'}</Text>
+          <Text style={styles.userName}>{user?.data?.firstName || 'Ziyaretçi'}</Text>
         </View>
         <TouchableOpacity style={styles.notificationButton}>
           <Ionicons name="notifications-outline" size={24} color="#333" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,101 +7,104 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCart } from '../../src/context/CartContext';
+import { useRouter } from 'expo-router';
+import { getDevServerIp } from '../../src/utils/networkUtils';
 
-// Örnek sepet verileri
-const INITIAL_CART_ITEMS = [
-  { id: '1', name: 'Taze Domates', price: 12.90, quantity: 2, unit: 'kg' },
-  { id: '2', name: 'Organik Elma', price: 15.50, quantity: 1, unit: 'kg' },
-  { id: '3', name: 'Köy Peyniri', price: 80.00, quantity: 0.5, unit: 'kg' },
-  { id: '4', name: 'Çiftlik Yumurtası', price: 40.00, quantity: 1, unit: '30 adet' },
-];
+// IP adresini al
+const SERVER_IP = getDevServerIp();
 
 export default function CartScreen() {
-  const [cartItems, setCartItems] = useState(INITIAL_CART_ITEMS);
+  const { 
+    cart, 
+    updateQuantity, 
+    removeFromCart,
+    getCartTotal,
+    getShippingFee,
+    getOrderTotal
+  } = useCart();
+  const router = useRouter();
 
   // Ürün miktarını arttır
   const increaseQuantity = (id: string) => {
-    setCartItems(
-      cartItems.map(item => 
-        item.id === id 
-          ? { ...item, quantity: item.quantity + (item.unit === 'kg' ? 0.5 : 1) }
-          : item
-      )
-    );
+    const item = cart.items.find(item => item._id === id);
+    if (item) {
+      updateQuantity({ _id: id }, item.quantity + (item.unit === 'kg' ? 0.5 : 1));
+    }
   };
 
   // Ürün miktarını azalt
   const decreaseQuantity = (id: string) => {
-    setCartItems(
-      cartItems.map(item => {
-        if (item.id === id) {
-          const newQuantity = item.quantity - (item.unit === 'kg' ? 0.5 : 1);
-          return newQuantity <= 0 
-            ? { ...item, quantity: item.unit === 'kg' ? 0.5 : 1 }
-            : { ...item, quantity: newQuantity };
-        }
-        return item;
-      })
-    );
-  };
-
-  // Ürünü sepetten kaldır
-  const removeFromCart = (id: string) => {
-    Alert.alert(
-      "Ürünü Kaldır",
-      "Bu ürünü sepetten kaldırmak istediğinize emin misiniz?",
-      [
-        {
-          text: "İptal",
-          style: "cancel"
-        },
-        { 
-          text: "Kaldır", 
-          onPress: () => setCartItems(cartItems.filter(item => item.id !== id)),
-          style: "destructive"
-        }
-      ]
-    );
-  };
-
-  // Toplam ürün tutarı
-  const getItemTotal = (price: number, quantity: number) => {
-    return price * quantity;
-  };
-
-  // Sepet toplamı
-  const getCartTotal = () => {
-    return cartItems.reduce((total, item) => total + getItemTotal(item.price, item.quantity), 0);
-  };
-
-  // Kargo ücreti
-  const getShippingFee = () => {
-    const cartTotal = getCartTotal();
-    return cartTotal < 150 ? 20 : 0;
-  };
-
-  // Genel toplam
-  const getOrderTotal = () => {
-    return getCartTotal() + getShippingFee();
+    const item = cart.items.find(item => item._id === id);
+    if (item) {
+      const newQuantity = item.quantity - (item.unit === 'kg' ? 0.5 : 1);
+      if (newQuantity <= 0) {
+        // Onay soralım
+        Alert.alert(
+          "Ürünü Kaldır",
+          "Bu ürünü sepetten kaldırmak istediğinize emin misiniz?",
+          [
+            {
+              text: "İptal",
+              style: "cancel"
+            },
+            { 
+              text: "Kaldır", 
+              onPress: () => removeFromCart({ _id: id }),
+              style: "destructive"
+            }
+          ]
+        );
+      } else {
+        updateQuantity({ _id: id }, newQuantity);
+      }
+    }
   };
 
   // Sepet öğesini render et
-  const renderCartItem = ({ item }: { item: typeof INITIAL_CART_ITEMS[0] }) => {
-    const itemTotal = getItemTotal(item.price, item.quantity);
+  const renderCartItem = ({ item }: { item: any }) => {
+    const itemTotal = item.price * item.quantity;
     
     return (
       <View style={styles.cartItem}>
         <View style={styles.productImagePlaceholder}>
-          <Ionicons name="image-outline" size={30} color="#ccc" />
+          {item.image ? (
+            <Image
+              source={{ 
+                uri: `http://${SERVER_IP}:5000/uploads/product-images/${item.image}` 
+              }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Ionicons name="image-outline" size={30} color="#ccc" />
+          )}
         </View>
         
         <View style={styles.itemDetails}>
           <View style={styles.itemNameRow}>
             <Text style={styles.itemName}>{item.name}</Text>
             <TouchableOpacity
-              onPress={() => removeFromCart(item.id)}
+              onPress={() => {
+                Alert.alert(
+                  "Ürünü Kaldır",
+                  "Bu ürünü sepetten kaldırmak istediğinize emin misiniz?",
+                  [
+                    {
+                      text: "İptal",
+                      style: "cancel"
+                    },
+                    { 
+                      text: "Kaldır", 
+                      onPress: () => removeFromCart({ _id: item._id }),
+                      style: "destructive"
+                    }
+                  ]
+                );
+              }}
               style={styles.removeButton}
             >
               <Ionicons name="trash-outline" size={20} color="#F44336" />
@@ -113,7 +116,7 @@ export default function CartScreen() {
           <View style={styles.quantityContainer}>
             <TouchableOpacity
               style={styles.quantityButton}
-              onPress={() => decreaseQuantity(item.id)}
+              onPress={() => decreaseQuantity(item._id)}
             >
               <Ionicons name="remove" size={18} color="#4CAF50" />
             </TouchableOpacity>
@@ -124,7 +127,7 @@ export default function CartScreen() {
             
             <TouchableOpacity
               style={styles.quantityButton}
-              onPress={() => increaseQuantity(item.id)}
+              onPress={() => increaseQuantity(item._id)}
             >
               <Ionicons name="add" size={18} color="#4CAF50" />
             </TouchableOpacity>
@@ -140,15 +143,15 @@ export default function CartScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Sepetim</Text>
-        <Text style={styles.itemCount}>{cartItems.length} ürün</Text>
+        <Text style={styles.itemCount}>{cart.items.length} ürün</Text>
       </View>
 
-      {cartItems.length > 0 ? (
+      {cart.items.length > 0 ? (
         <>
           <FlatList
-            data={cartItems}
+            data={cart.items}
             renderItem={renderCartItem}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item._id}
             contentContainerStyle={styles.cartList}
           />
           
@@ -193,7 +196,10 @@ export default function CartScreen() {
           <Text style={styles.emptyCartText}>
             Sepetinizde hiç ürün bulunmuyor. Alışverişe başlamak için ürünler sayfasını ziyaret edebilirsiniz.
           </Text>
-          <TouchableOpacity style={styles.shopButton}>
+          <TouchableOpacity 
+            style={styles.shopButton}
+            onPress={() => router.navigate('/(tabs)/products')}
+          >
             <Text style={styles.shopButtonText}>Alışverişe Başla</Text>
           </TouchableOpacity>
         </View>
@@ -246,6 +252,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
   },
   itemDetails: {
     flex: 1,
@@ -253,7 +264,7 @@ const styles = StyleSheet.create({
   itemNameRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 4,
   },
   itemName: {
@@ -261,6 +272,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     flex: 1,
+    marginRight: 8,
   },
   removeButton: {
     padding: 4,
@@ -273,21 +285,20 @@ const styles = StyleSheet.create({
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   quantityButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#f0f8f0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   quantity: {
     fontSize: 14,
     color: '#333',
-    fontWeight: '500',
-    marginHorizontal: 10,
+    marginHorizontal: 8,
     minWidth: 60,
     textAlign: 'center',
   },
@@ -295,18 +306,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#4CAF50',
-    marginLeft: 'auto',
   },
   summaryContainer: {
     backgroundColor: '#f9f9f9',
     borderRadius: 10,
     padding: 16,
-    marginBottom: 16,
+    marginTop: 'auto',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   summaryLabel: {
     fontSize: 14,
@@ -321,12 +331,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4CAF50',
     fontStyle: 'italic',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   divider: {
     height: 1,
     backgroundColor: '#e0e0e0',
-    marginVertical: 10,
+    marginVertical: 12,
   },
   totalRow: {
     flexDirection: 'row',
@@ -345,46 +355,47 @@ const styles = StyleSheet.create({
   },
   checkoutButton: {
     backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkoutButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
     marginRight: 8,
   },
   emptyCartContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 32,
   },
   emptyCartTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: 16,
+    marginBottom: 8,
   },
   emptyCartText: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   shopButton: {
     backgroundColor: '#4CAF50',
+    borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 8,
   },
   shopButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
   },
 }); 

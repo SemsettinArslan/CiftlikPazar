@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,42 +8,145 @@ import {
   TextInput,
   Dimensions,
   ScrollView,
+  ActivityIndicator,
+  Image,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { productAPI, categoryAPI } from '../../src/services/api';
+import { getDevServerIp } from '../../src/utils/networkUtils';
+import { useCart } from '../../src/context/CartContext';
 
-// Örnek kategoriler
-const CATEGORIES = [
-  { id: 'all', name: 'Tümü' },
-  { id: 'vegetables', name: 'Sebzeler' },
-  { id: 'fruits', name: 'Meyveler' },
-  { id: 'dairy', name: 'Süt Ürünleri' },
-  { id: 'meat', name: 'Et Ürünleri' },
-  { id: 'organic', name: 'Organik' },
-];
+// IP adresini al
+const SERVER_IP = getDevServerIp();
 
-// Örnek ürünler
-export const PRODUCTS = [
-  { id: '1', name: 'Taze Domates', price: '12.90', unit: 'kg', category: 'vegetables', isFavorite: false, rating: 4.8 },
-  { id: '2', name: 'Organik Elma', price: '15.50', unit: 'kg', category: 'fruits', isFavorite: true, rating: 4.5 },
-  { id: '3', name: 'Köy Peyniri', price: '80.00', unit: 'kg', category: 'dairy', isFavorite: false, rating: 4.9 },
-  { id: '4', name: 'Çiftlik Yumurtası', price: '40.00', unit: '30 adet', category: 'dairy', isFavorite: true, rating: 4.7 },
-  { id: '5', name: 'Kuzu Eti', price: '185.00', unit: 'kg', category: 'meat', isFavorite: false, rating: 4.6 },
-  { id: '6', name: 'Ispanak', price: '10.90', unit: 'demet', category: 'vegetables', isFavorite: false, rating: 4.3 },
-  { id: '7', name: 'Organik Bal', price: '150.00', unit: 'kg', category: 'organic', isFavorite: true, rating: 4.9 },
-  { id: '8', name: 'Keçi Sütü', price: '25.00', unit: 'litre', category: 'dairy', isFavorite: false, rating: 4.4 },
-  { id: '9', name: 'Çilek', price: '30.00', unit: 'kg', category: 'fruits', isFavorite: false, rating: 4.7 },
-  { id: '10', name: 'Patates', price: '8.50', unit: 'kg', category: 'vegetables', isFavorite: false, rating: 4.2 },
-];
-
+// Ekran genişliği
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width / 2 - 24;
 
 export default function ProductsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [sortOption, setSortOption] = useState('default'); // default, price-asc, price-desc, name-asc, name-desc
   const router = useRouter();
+  const { addToCart } = useCart();
+
+  // Kategori bilgisini alma yardımcı fonksiyonu
+  const getCategoryName = (categoryItem: any) => {
+    if (!categoryItem) return '';
+    
+    // Kategori bir string ise direkt ID olarak kullan
+    if (typeof categoryItem === 'string') {
+      const foundCategory = categories.find(cat => (cat._id || cat.id) === categoryItem);
+      return foundCategory ? (foundCategory.name || foundCategory.category_name) : '';
+    }
+    
+    // Kategori bir obje ise name veya category_name'e bak
+    return categoryItem.name || categoryItem.category_name || '';
+  };
+
+  // Ürünleri ve kategorileri yükle
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Ürünleri getir
+        const productsResponse = await productAPI.getAllProducts();
+        console.log('Ürünler API yanıtı:', productsResponse);
+        
+        // API yanıt formatını kontrol et
+        if (productsResponse.success && Array.isArray(productsResponse.data)) {
+          setProducts(productsResponse.data);
+        } else if (Array.isArray(productsResponse)) {
+          setProducts(productsResponse);
+        } else if (productsResponse.data && Array.isArray(productsResponse.data)) {
+          setProducts(productsResponse.data);
+        } else {
+          console.warn('Beklenmeyen API yanıt formatı:', productsResponse);
+          setProducts([]);
+        }
+        
+        // Kategorileri getir
+        const categoriesResponse = await categoryAPI.getAllCategories();
+        console.log('Kategoriler API yanıtı:', categoriesResponse);
+        console.log('Ham kategori verileri:', JSON.stringify(categoriesResponse));
+        
+        // Tüm kategoriler seçeneği ekle
+        const allCategoriesOption = { _id: 'all', name: 'Tümü', category_name: 'Tümü' };
+        
+        // Varsayılan kategorilere düşüldüyse bildirim göster
+        if (categoriesResponse.isDefault) {
+          console.warn('DİKKAT: Varsayılan kategoriler kullanılıyor, veritabanına bağlanılamadı.');
+        }
+        
+        if (categoriesResponse.success && Array.isArray(categoriesResponse.data)) {
+          // Kategorileri işle ve name alanlarını düzelt
+          const processedCategories = categoriesResponse.data.map((cat: any) => {
+            // Kategori adını garanti altına al
+            if (!cat.name && cat.category_name) {
+              cat.name = cat.category_name;
+            } else if (!cat.category_name && cat.name) {
+              cat.category_name = cat.name; 
+            }
+            return cat;
+          });
+          
+          setCategories([allCategoriesOption, ...processedCategories]);
+          console.log('İşlenen kategoriler:', allCategoriesOption, ...processedCategories);
+        } else if (Array.isArray(categoriesResponse)) {
+          // Kategorileri işle ve name alanlarını düzelt
+          const processedCategories = categoriesResponse.map((cat: any) => {
+            // Kategori adını garanti altına al
+            if (!cat.name && cat.category_name) {
+              cat.name = cat.category_name;
+            } else if (!cat.category_name && cat.name) {
+              cat.category_name = cat.name; 
+            }
+            return cat;
+          });
+          
+          setCategories([allCategoriesOption, ...processedCategories]);
+          console.log('İşlenen kategoriler (dizi):', allCategoriesOption, ...processedCategories);
+        } else if (categoriesResponse.data && Array.isArray(categoriesResponse.data.data)) {
+          // Kategorileri işle ve name alanlarını düzelt
+          const processedCategories = categoriesResponse.data.data.map((cat: any) => {
+            // Kategori adını garanti altına al
+            if (!cat.name && cat.category_name) {
+              cat.name = cat.category_name;
+            } else if (!cat.category_name && cat.name) {
+              cat.category_name = cat.name; 
+            }
+            return cat;
+          });
+          
+          setCategories([allCategoriesOption, ...processedCategories]);
+          console.log('İşlenen kategoriler (iç içe):', allCategoriesOption, ...processedCategories);
+        } else {
+          console.warn('Beklenmeyen kategori API yanıt formatı:', categoriesResponse);
+          setCategories([allCategoriesOption]);
+        }
+        
+        // Başlangıçta Tümü kategorisini seçili olarak ayarla
+        setSelectedCategory('all');
+        
+        setLoading(false);
+      } catch (err: any) {
+        console.error('Veri yükleme hatası:', err);
+        setError(err.message || 'Ürünler yüklenirken bir hata oluştu');
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
   // Favori ekle/çıkar
   const toggleFavorite = (productId: string) => {
@@ -54,60 +157,130 @@ export default function ProductsScreen() {
     }
   };
 
-  // Kategoriye ve arama sorgusuna göre filtreleme
-  const filteredProducts = PRODUCTS.filter(product => {
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  // Kategoriye, arama sorgusuna ve sıralama seçeneğine göre filtreleme
+  const getFilteredAndSortedProducts = () => {
+    // Önce filtreleme yapalım
+    const filtered = products.filter(product => {
+      // Tümü seçiliyse veya boş kategori seçiliyse
+      const matchesCategory = selectedCategory === 'all' || selectedCategory === '' || 
+        (product.category && 
+          (typeof product.category === 'string' 
+            ? product.category === selectedCategory 
+            : product.category._id === selectedCategory));
+      
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+    
+    // Sonra sıralama yapalım
+    switch (sortOption) {
+      case 'price-asc':
+        return [...filtered].sort((a, b) => a.price - b.price);
+      case 'price-desc':
+        return [...filtered].sort((a, b) => b.price - a.price);
+      case 'name-asc':
+        return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc':
+        return [...filtered].sort((a, b) => b.name.localeCompare(a.name));
+      default:
+        return filtered;
+    }
+  };
+
+  // Sıralama seçeneğine göre başlık metni
+  const getSortOptionText = () => {
+    switch (sortOption) {
+      case 'price-asc':
+        return 'Fiyat: Düşükten Yükseğe';
+      case 'price-desc':
+        return 'Fiyat: Yüksekten Düşüğe';
+      case 'name-asc':
+        return 'İsim: A-Z';
+      case 'name-desc':
+        return 'İsim: Z-A';
+      default:
+        return 'Varsayılan Sıralama';
+    }
+  };
+
+  // Kategori seçildiğinde modalı kapatma - bunu kaldırıyoruz, sadece seçim yapılsın
+  const handleCategorySelect = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    // Modal kapanmasın, sadece kategori seçilsin
+  };
+
+  // Tüm modalı kapat - x tuşuna basılınca
+  const closeModal = () => {
+    setFilterModalVisible(false);
+  };
+
+  // Filtre uygula ve modalı kapat - Uygula butonuna basılınca
+  const applyFilters = () => {
+    setFilterModalVisible(false);
+  };
 
   // Kategori öğesini render et
-  const renderCategoryItem = ({ item }: { item: { id: string; name: string } }) => {
-    const isSelected = item.id === selectedCategory;
+  const renderCategoryItem = ({ item }: { item: any }) => {
+    // Kategori ID'si, API yanıt yapısına göre _id veya id olabilir
+    const categoryId = item._id || item.id;
+    const isSelected = categoryId === selectedCategory;
+    
+    // Kategori ismi, API yanıt yapısına göre name veya category_name olabilir
+    const categoryName = item.name || item.category_name;
     
     return (
       <TouchableOpacity
         style={[
-          styles.categoryItem,
-          isSelected && styles.selectedCategoryItem,
+          styles.filterCategoryItem,
+          isSelected && styles.selectedFilterCategoryItem,
         ]}
-        onPress={() => setSelectedCategory(item.id)}
+        onPress={() => handleCategorySelect(categoryId)}
       >
         <Text
           style={[
-            styles.categoryText,
-            isSelected && styles.selectedCategoryText,
+            styles.filterCategoryText,
+            isSelected && styles.selectedFilterCategoryText,
           ]}
         >
-          {item.name}
+          {categoryName}
         </Text>
       </TouchableOpacity>
     );
   };
 
-  // Ürün detayına git
-  const goToProductDetail = (productId: string) => {
-    router.push(`/product-detail?id=${productId}` as any);
-  };
-
   // Ürün kartını render et
-  const renderProductItem = ({ item }: { item: typeof PRODUCTS[0] }) => {
-    const isFavorite = favorites.includes(item.id);
+  const renderProductItem = ({ item }: { item: any }) => {
+    // Ürün ID'si, API yanıt yapısına göre _id veya id olabilir
+    const productId = item._id || item.id;
+    const isFavorite = favorites.includes(productId);
     
     return (
       <TouchableOpacity 
         style={styles.productCard}
-        onPress={() => goToProductDetail(item.id)}
+        onPress={() => {
+          const href = `/product/${productId}`;
+          router.push(href as any);
+        }}
       >
         <View style={styles.productImageContainer}>
+          {item.image ? (
+            <Image
+              source={{ 
+                uri: `http://${SERVER_IP}:5000/uploads/product-images/${item.image}` 
+              }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
+          ) : (
           <View style={styles.productImagePlaceholder}>
             <Ionicons name="image-outline" size={40} color="#ccc" />
           </View>
+          )}
           <TouchableOpacity
             style={styles.favoriteButton}
             onPress={(e) => {
-              e.stopPropagation(); // Üst TouchableOpacity'nin tetiklenmesini önle
-              toggleFavorite(item.id);
+              e.stopPropagation(); // Kart tıklamasını engeller
+              toggleFavorite(productId);
             }}
           >
             <Ionicons
@@ -118,35 +291,193 @@ export default function ProductsScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.productInfo}>
+          <Text style={styles.categoryLabel}>{getCategoryName(item.category)}</Text>
           <Text style={styles.productName}>{item.name}</Text>
           <View style={styles.productPriceRow}>
-            <Text style={styles.productPrice}>{item.price} ₺</Text>
-            <Text style={styles.productUnit}>/ {item.unit}</Text>
+            <Text style={styles.productPrice}>{item.price?.toFixed(2)} ₺</Text>
+            <Text style={styles.productUnit}>/ {item.unit || 'birim'}</Text>
           </View>
+          {item.rating ? (
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={14} color="#FFD700" />
             <Text style={styles.ratingText}>{item.rating}</Text>
           </View>
+          ) : null}
           <TouchableOpacity 
             style={styles.addButton}
             onPress={(e) => {
-              e.stopPropagation(); // Üst TouchableOpacity'nin tetiklenmesini önle
-              // Sepete ekleme işlemi burada yapılabilir
+              e.stopPropagation(); // Kart tıklamasını engeller
+              // Sepete ekleme işlemi
+              addToCart({
+                _id: item._id || item.id,
+                name: item.name,
+                price: item.price,
+                quantity: 1,
+                unit: item.unit || 'birim',
+                countInStock: item.countInStock || 10,
+                image: item.image,
+                farmer: item.farmer
+              });
             }}
           >
-            <Ionicons name="add" size={20} color="#fff" />
+            <Ionicons name="cart-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
   };
 
+  // Filtre Modalı
+  const FilterModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={filterModalVisible}
+      onRequestClose={closeModal}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Filtrele ve Sırala</Text>
+            <TouchableOpacity onPress={closeModal}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.modalScrollView}>
+            {/* Kategori Seçimi */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Kategoriler</Text>
+              <View style={styles.filterCategoriesContainer}>
+                {categories.map((category) => {
+                  const categoryId = category._id || category.id;
+                  const isSelected = categoryId === selectedCategory;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={`category-${categoryId || Math.random()}`}
+                      style={[
+                        styles.filterCategoryItem,
+                        isSelected && styles.selectedFilterCategoryItem,
+                      ]}
+                      onPress={() => handleCategorySelect(categoryId)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterCategoryText,
+                          isSelected && styles.selectedFilterCategoryText,
+                        ]}
+                      >
+                        {category.name || category.category_name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+            
+            {/* Sıralama Seçimi */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionTitle}>Sıralama</Text>
+              <View style={styles.sortOptionsContainer}>
+                {[
+                  { id: 'default', label: 'Varsayılan Sıralama' },
+                  { id: 'price-asc', label: 'Fiyat: Düşükten Yükseğe' },
+                  { id: 'price-desc', label: 'Fiyat: Yüksekten Düşüğe' },
+                  { id: 'name-asc', label: 'İsim: A-Z' },
+                  { id: 'name-desc', label: 'İsim: Z-A' },
+                ].map((option) => (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[
+                      styles.sortOptionItem,
+                      sortOption === option.id && styles.selectedSortOptionItem,
+                    ]}
+                    onPress={() => setSortOption(option.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.sortOptionText,
+                        sortOption === option.id && styles.selectedSortOptionText,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {sortOption === option.id && (
+                      <Ionicons name="checkmark" size={18} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+          
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={() => {
+                setSelectedCategory('all');
+                setSortOption('default');
+              }}
+            >
+              <Text style={styles.resetButtonText}>Sıfırla</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={applyFilters}
+            >
+              <Text style={styles.applyButtonText}>Uygula</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Ürünler yükleniyor...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Ionicons name="alert-circle-outline" size={60} color="#FF5252" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            setLoading(true);
+            setError(null);
+            // Sayfayı yenile
+            router.replace('/products' as any);
+          }}
+        >
+          <Text style={styles.retryButtonText}>Tekrar Dene</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Filtre ve sıralama uygulanmış ürünleri al
+  const filteredAndSortedProducts = getFilteredAndSortedProducts();
+
   return (
     <View style={styles.container}>
+      {/* Filtre Modalı */}
+      <FilterModal />
+    
       {/* Başlık ve Filtreleme */}
       <View style={styles.header}>
         <Text style={styles.title}>Ürünler</Text>
-        <TouchableOpacity style={styles.filterButton}>
+        <TouchableOpacity 
+          style={styles.filterButton}
+          onPress={() => setFilterModalVisible(true)}
+        >
           <Ionicons name="options-outline" size={24} color="#333" />
         </TouchableOpacity>
       </View>
@@ -167,24 +498,39 @@ export default function ProductsScreen() {
         )}
       </View>
 
-      {/* Kategori Listesi */}
-      <View style={styles.categoriesContainer}>
-        <FlatList
-          data={CATEGORIES}
-          renderItem={renderCategoryItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        />
-      </View>
+      {/* Aktif Filtre Bilgisi */}
+      {(selectedCategory !== 'all' || sortOption !== 'default') && (
+        <View style={styles.activeFiltersContainer}>
+          {selectedCategory !== 'all' && (
+            <View style={styles.activeFilterBadge}>
+              <Text style={styles.activeFilterText}>
+                {categories.find(cat => (cat._id || cat.id) === selectedCategory) 
+                  ? getCategoryName(categories.find(cat => (cat._id || cat.id) === selectedCategory))
+                  : 'Kategori'}
+              </Text>
+              <TouchableOpacity onPress={() => setSelectedCategory('all')}>
+                <Ionicons name="close" size={16} color="#666" />
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {sortOption !== 'default' && (
+            <View style={styles.activeFilterBadge}>
+              <Text style={styles.activeFilterText}>{getSortOptionText()}</Text>
+              <TouchableOpacity onPress={() => setSortOption('default')}>
+                <Ionicons name="close" size={16} color="#666" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Ürün Listesi */}
-      {filteredProducts.length > 0 ? (
+      {filteredAndSortedProducts.length > 0 ? (
         <FlatList
-          data={filteredProducts}
+          data={filteredAndSortedProducts}
           renderItem={renderProductItem}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `product-${item._id || item.id || index}`}
           numColumns={2}
           columnWrapperStyle={styles.productRow}
           showsVerticalScrollIndicator={false}
@@ -206,6 +552,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     padding: 16,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#757575',
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 18,
+    color: '#FF5252',
+    textAlign: 'center',
+    marginHorizontal: 24,
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontWeight: '500',
   },
   header: {
     flexDirection: 'row',
@@ -246,30 +620,6 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 6,
   },
-  categoriesContainer: {
-    marginBottom: 16,
-  },
-  categoriesList: {
-    paddingVertical: 8,
-  },
-  categoryItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  selectedCategoryItem: {
-    backgroundColor: '#4CAF50',
-  },
-  categoryText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  selectedCategoryText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
   productsList: {
     paddingBottom: 16,
   },
@@ -295,9 +645,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
+  productImage: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f9f9f9',
+  },
   productImagePlaceholder: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f9f9f9',
   },
   favoriteButton: {
     position: 'absolute',
@@ -313,6 +671,11 @@ const styles = StyleSheet.create({
   productInfo: {
     padding: 12,
     position: 'relative',
+  },
+  categoryLabel: {
+    fontSize: 11,
+    color: '#757575',
+    marginBottom: 2,
   },
   productName: {
     fontSize: 14,
@@ -372,5 +735,148 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  // Modal Stilleri
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 30,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  modalScrollView: {
+    paddingHorizontal: 20,
+    marginVertical: 10,
+  },
+  filterSection: {
+    marginBottom: 20,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  filterCategoriesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  filterCategoryItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  selectedFilterCategoryItem: {
+    backgroundColor: '#4CAF50',
+  },
+  filterCategoryText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedFilterCategoryText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  sortOptionsContainer: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  sortOptionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  selectedSortOptionItem: {
+    backgroundColor: '#4CAF50',
+  },
+  sortOptionText: {
+    fontSize: 15,
+    color: '#333',
+  },
+  selectedSortOptionText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  resetButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resetButtonText: {
+    fontSize: 15,
+    color: '#666',
+  },
+  applyButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  applyButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  // Aktif Filtre Gösterimi
+  activeFiltersContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
+  activeFilterBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  activeFilterText: {
+    fontSize: 13,
+    color: '#333',
+    marginRight: 6,
   },
 }); 

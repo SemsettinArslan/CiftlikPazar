@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useSegments } from 'expo-router';
 import { Alert, Platform } from 'react-native';
+import { getApiBaseUrl } from '../utils/networkUtils';
 
 const AuthContext = createContext();
 
@@ -9,24 +10,14 @@ export const useAuth = () => {
   return useContext(AuthContext);
 };
 
-// API URL - Platformlara göre URL'leri ayarla
-const getApiUrl = () => {
-  // Android emülatörde localhost yerine 10.0.2.2 kullanılır
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api'; // Android için localhost
-  } else {
-    return 'http://localhost:5000/api'; // iOS için localhost
-  }
-};
+// Sabit API URL yerine dinamik API URL kullan
+const API_URL = getApiBaseUrl();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const router = useRouter();
-
-  // API URL'i dinamik olarak al
-  const API_URL = getApiUrl();
 
   useEffect(() => {
     // Check if user is logged in
@@ -62,9 +53,11 @@ export const AuthProvider = ({ children }) => {
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye timeout
     
     try {
-      console.log(`Register isteği gönderiliyor: ${API_URL}/auth/register`, JSON.stringify(userData));
+      // Her istekte güncel API URL'ini al
+      const currentApiUrl = getApiBaseUrl();
+      console.log(`Register isteği gönderiliyor: ${currentApiUrl}/auth/register`, JSON.stringify(userData));
       
-      const response = await fetch(`${API_URL}/auth/register`, {
+      const response = await fetch(`${currentApiUrl}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -171,10 +164,11 @@ export const AuthProvider = ({ children }) => {
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye timeout
 
     try {
-      console.log(`Login isteği gönderiliyor: ${API_URL}/auth/login`);
+      // Her istekte güncel API URL'ini al
+      const currentApiUrl = getApiBaseUrl();
+      console.log(`Login isteği gönderiliyor: ${currentApiUrl}/auth/login`);
       
-      // Doğrudan API_URL kullan
-      const response = await fetch(`${API_URL}/auth/login`, {
+      const response = await fetch(`${currentApiUrl}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -263,8 +257,16 @@ export const AuthProvider = ({ children }) => {
       await AsyncStorage.setItem('user', JSON.stringify(data));
       setUser(data);
       
-      // Giriş başarılı olduğunda tabs sayfasına yönlendir
-      router.replace('/(tabs)');
+      // Kullanıcı rolüne göre yönlendirme
+      if (data.data && data.data.role === 'farmer') {
+        console.log('Çiftçi kullanıcısı tespit edildi, çiftçi paneline yönlendiriliyor');
+        router.replace('/farmer-dashboard');
+      } else {
+        // Normal kullanıcıları ana sayfaya yönlendir
+        console.log('Normal kullanıcı tespit edildi, ana sayfaya yönlendiriliyor');
+        router.replace('/(tabs)');
+      }
+      
       return data;
     } catch (error) {
       console.log('Login fonksiyonu hata yakaladı:', error);
@@ -312,6 +314,38 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Kullanıcı bilgilerini yenile
+  const refreshUserData = async () => {
+    if (!user || !user.token) return;
+
+    try {
+      // Her istekte güncel API URL'ini al
+      const currentApiUrl = getApiBaseUrl();
+      const response = await fetch(`${currentApiUrl}/auth/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user.token}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        // Mevcut kullanıcı bilgilerini sakla, sadece güncel veriyi güncelle
+        const updatedUser = {
+          ...user,
+          data: data.data
+        };
+        
+        // AsyncStorage ve state'i güncelle
+        await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      }
+    } catch (error) {
+      console.log('Kullanıcı bilgileri yenilenirken hata:', error);
+    }
+  };
+
   const value = {
     user,
     isLoading,
@@ -321,6 +355,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     setUser,
     API_URL,
+    refreshUserData
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

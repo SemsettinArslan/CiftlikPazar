@@ -105,6 +105,86 @@ exports.getMyFarm = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Çiftlik bilgilerini güncelle
+// @route   PUT /api/farmers/update-profile
+// @access  Private (Farmer)
+exports.updateFarm = asyncHandler(async (req, res, next) => {
+  console.log('Çiftlik bilgisi güncelleme isteği:', JSON.stringify(req.body, null, 2));
+  
+  // Kullanıcının çiftlik kaydını bul
+  let farmer = await Farmer.findOne({ user: req.user.id });
+  
+  if (!farmer) {
+    return next(new ErrorResponse('Çiftlik kaydınız bulunamadı', 404));
+  }
+  
+  // Güncellenecek alanları al
+  const {
+    farmName,
+    name,
+    address,
+    description,
+    phoneNumber,
+    city,
+    district,
+    taxNumber,
+    categories,
+    hasShipping
+  } = req.body;
+  
+  // Güncelleme nesnesini oluştur
+  const updateData = {
+    farmName: farmName || name,
+    address,
+    description,
+    phoneNumber,
+    city,
+    district,
+    taxNumber,
+    categories,
+    hasShipping: hasShipping === true
+  };
+  
+  // Undefined alanları kaldır
+  Object.keys(updateData).forEach(key => 
+    updateData[key] === undefined && delete updateData[key]
+  );
+  
+  console.log('Güncellenecek çiftlik bilgileri:', JSON.stringify(updateData, null, 2));
+  
+  // Telefon numarası varsa, kullanıcı bilgilerini de güncelle
+  if (phoneNumber) {
+    console.log('Telefon numarası güncelleniyor...');
+    
+    try {
+      // Kullanıcıyı bul ve telefon numarasını güncelle
+      await User.findByIdAndUpdate(
+        req.user.id,
+        { phone: phoneNumber },
+        { new: true, runValidators: true }
+      );
+      
+      console.log('Kullanıcı telefon numarası güncellendi');
+    } catch (error) {
+      console.error('Telefon numarası güncellenirken hata:', error);
+      return next(new ErrorResponse('Telefon numarası güncellenirken hata oluştu', 500));
+    }
+  }
+  
+  // Çiftliği güncelle
+  farmer = await Farmer.findOneAndUpdate(
+    { user: req.user.id },
+    updateData,
+    { new: true, runValidators: true }
+  ).populate('categories', 'category_name');
+  
+  res.status(200).json({
+    success: true,
+    data: farmer,
+    message: 'Çiftlik bilgileri başarıyla güncellendi'
+  });
+});
+
 // @desc    Çiftçi kaydını tamamla
 // @route   POST /api/farmers/complete-registration
 // @access  Public

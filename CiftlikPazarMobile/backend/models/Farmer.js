@@ -190,4 +190,4 @@ FarmerSchema.pre('save', function(next) {
   next();
 });
 
-module.exports = mongoose.model('Farmers', FarmerSchema, 'Farmers'); 
+module.exports = mongoose.model('Farmer', FarmerSchema, 'Farmers'); 
