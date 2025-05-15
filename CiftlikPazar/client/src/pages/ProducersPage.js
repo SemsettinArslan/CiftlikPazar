@@ -20,7 +20,7 @@ const ProducersPage = () => {
   useEffect(() => {
     const fetchProducers = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/farmers/public');
+        const response = await axios.get('http://localhost:3001/api/farmers/public');
         setProducers(response.data.data);
         
         // Şehirleri getir
@@ -37,7 +37,7 @@ const ProducersPage = () => {
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true);
-        const response = await axios.get('http://localhost:5000/api/categories');
+        const response = await axios.get('http://localhost:3001/api/categories');
         setCategories(response.data.data);
         setLoadingCategories(false);
       } catch (err) {

@@ -3,9 +3,10 @@ import { Container, Row, Col, Card, Nav, Tab, Alert, Badge, Form, Button, Spinne
 import { FaLeaf, FaBoxOpen, FaShoppingCart, FaChartBar, FaCog, FaTachometerAlt, FaExclamationCircle, FaSave, FaCheck } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import ProductManagement from './ProductManagement';
 
 // Backend API URL'i
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = 'http://localhost:3001';
 
 // Çiftlik kategorileri
 const FARM_CATEGORIES = [
@@ -527,7 +528,6 @@ const FarmerDashboardPage = () => {
                           <h5 className="mb-3 text-success">Çiftlik Bilgileri</h5>
                           <p className="mb-2"><strong>Çiftlik Adı:</strong> {farmerData?.farmName}</p>
                           <p className="mb-2"><strong>Konum:</strong> {farmerData?.city}, {farmerData?.district}</p>
-                          <p className="mb-2"><strong>Telefon:</strong> {userData?.phoneNumber}</p>
                           <p className="mb-0"><strong>Vergi No:</strong> {farmerData?.taxNumber}</p>
                         </Card.Body>
                       </Card>
@@ -548,19 +548,6 @@ const FarmerDashboardPage = () => {
                             <span><strong>Bu Ay Toplam Satış:</strong></span>
                             <Badge bg="light" text="success" pill className="fs-6">{0} ₺</Badge>
                           </p>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  </Row>
-                  <Row>
-                    <Col md={12}>
-                      <Card className="border-0 shadow-sm">
-                        <Card.Body className="p-4">
-                          <h5 className="mb-3 text-success">Son Etkinlikler</h5>
-                          <Alert variant="info" className="d-flex align-items-center mb-0">
-                            <FaExclamationCircle className="me-2 text-info" />
-                            Henüz bir etkinlik kaydı bulunmuyor. Ürün eklemeye başladığınızda burada son etkinliklerinizi göreceksiniz.
-                          </Alert>
                         </Card.Body>
                       </Card>
                     </Col>
@@ -791,11 +778,7 @@ const FarmerDashboardPage = () => {
                 </Tab.Pane>
 
                 <Tab.Pane eventKey="products" active={activeTab === 'products'}>
-                  <h4 className="border-bottom pb-3 mb-4 text-success">Ürün Yönetimi</h4>
-                  <Alert variant="info" className="d-flex align-items-center">
-                    <FaExclamationCircle className="me-2 text-info" />
-                    Ürün yönetimi modülü henüz eklenmedi. Yakında burada ürünlerinizi ekleyebilecek ve düzenleyebileceksiniz.
-                  </Alert>
+                  <ProductManagement apiClient={apiClient} farmerId={farmerData?._id} />
                 </Tab.Pane>
 
                 <Tab.Pane eventKey="orders" active={activeTab === 'orders'}>

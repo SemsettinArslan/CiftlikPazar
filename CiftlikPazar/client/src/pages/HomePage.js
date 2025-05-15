@@ -26,7 +26,7 @@ const HomePage = () => {
     const fetchFeaturedProducts = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('http://localhost:5000/api/products/featured');
+        const response = await axios.get('http://localhost:3001/api/products/featured');
         console.log('Öne çıkan ürünler yanıtı:', response.data);
         
         if (response.data && response.data.success && response.data.data) {
@@ -145,7 +145,7 @@ const HomePage = () => {
                     {product.image ? (
                       <Card.Img 
                         variant="top" 
-                        src={`http://localhost:5000/uploads/product-images/${product.image}`}
+                        src={`http://localhost:3001/uploads/product-images/${product.image}`}
                         alt={product.name}
                         style={{ height: '200px', objectFit: 'cover' }}
                         onError={(e) => {

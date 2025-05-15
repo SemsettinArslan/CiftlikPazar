@@ -1,11 +1,63 @@
-import React from 'react';
-import { Container, Row, Col, Card, Button, Table, Image, Form, Alert } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Container, Row, Col, Card, Button, Table, Image, Form, Alert, InputGroup, Spinner, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { FaArrowLeft, FaTrash, FaMinus, FaPlus, FaShoppingCart, FaLeaf } from 'react-icons/fa';
+import { FaArrowLeft, FaTrash, FaMinus, FaPlus, FaShoppingCart, FaLeaf, FaTicketAlt, FaTimes, FaExclamationTriangle, FaInfoCircle } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
 
 const CartPage = () => {
-  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart, applyCoupon, removeCoupon, couponLoading, couponError } = useCart();
+  const [couponCode, setCouponCode] = useState('');
+  const [couponValidationError, setCouponValidationError] = useState('');
+
+  const validateCouponBeforeSubmit = () => {
+    // Kupon kodu boş ise
+    if (!couponCode.trim()) {
+      setCouponValidationError('Lütfen bir kupon kodu girin.');
+      return false;
+    }
+    
+    // Sepette ürün yoksa
+    if (cart.items.length === 0) {
+      setCouponValidationError('Sepetinizde ürün bulunmamaktadır. Kupon uygulanamaz.');
+      return false;
+    }
+    
+    // Diğer kontroller (örneğin minimum sepet tutarı kontrolü ön tarafta da yapılabilir)
+    setCouponValidationError('');
+    return true;
+  };
+
+  const handleApplyCoupon = async () => {
+    // Form doğrulaması
+    if (!validateCouponBeforeSubmit()) {
+      return;
+    }
+    
+    const success = await applyCoupon(couponCode);
+    
+    // Başarılı ise input'u temizle
+    if (success) {
+      setCouponCode('');
+      setCouponValidationError('');
+    }
+  };
+
+  // Kupon kodunu enter ile uygulama
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleApplyCoupon();
+    }
+  };
+
+  // Minimum alışveriş koşulunun kontrol edilmesi
+  const isMinimumPurchaseMet = !cart.coupon || cart.totalPrice >= cart.coupon.minimumPurchase;
+  
+  // Gerçek indirim tutarı
+  const actualDiscountAmount = isMinimumPurchaseMet ? cart.discountAmount : 0;
+  
+  // Son toplam fiyat (minimum alışveriş koşulunu kontrol ederek)
+  const finalTotal = cart.totalPrice - actualDiscountAmount;
 
   return (
     <Container className="py-5">
@@ -46,7 +98,7 @@ const CartPage = () => {
                           <Link to={`/product/${item._id}`}>
                             {item.image ? (
                               <Image 
-                                src={`http://localhost:5000/uploads/product-images/${item.image}`}
+                                src={`http://localhost:3001/uploads/product-images/${item.image}`}
                                 alt={item.name}
                                 width={80}
                                 height={80}
@@ -144,6 +196,153 @@ const CartPage = () => {
           </Col>
           
           <Col lg={4}>
+            <Card className="shadow-sm border-0 mb-4">
+              <Card.Header className="bg-success text-white">
+                <h5 className="mb-0 d-flex align-items-center">
+                  <FaTicketAlt className="me-2" /> Kupon Kodu
+                </h5>
+              </Card.Header>
+              <Card.Body>
+                {cart.coupon ? (
+                  // Uygulanan kupon gösterimi
+                  <div>
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded mb-3">
+                      <div>
+                        <div className="fw-bold">{cart.coupon.code}</div>
+                        <div className="text-muted">{cart.coupon.description}</div>
+                        {!isMinimumPurchaseMet && (
+                          <div className="mt-2">
+                            <Badge bg="danger" className="d-flex align-items-center py-2">
+                              <FaExclamationTriangle className="me-1" /> 
+                              Minimum tutar: {cart.coupon.minimumPurchase.toFixed(2)} ₺
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm"
+                        className="ms-2"
+                        onClick={removeCoupon}
+                      >
+                        <FaTimes />
+                      </Button>
+                    </div>
+                    
+                    {/* Kupon Bilgileri */}
+                    <div className="mb-3">
+                      {cart.coupon.type === 'percentage' ? (
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <span>İndirim Oranı:</span>
+                          <Badge bg="success" className="fs-6">%{cart.coupon.value}</Badge>
+                        </div>
+                      ) : (
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <span>İndirim Tutarı:</span>
+                          <Badge bg="success" className="fs-6">{cart.coupon.value.toFixed(2)} ₺</Badge>
+                        </div>
+                      )}
+                      
+                      {/* İndirim Durumu */}
+                      <div className="d-flex justify-content-between align-items-center">
+                        <span>Uygulanacak İndirim:</span>
+                        {isMinimumPurchaseMet ? (
+                          <span className="text-success fw-bold">-{actualDiscountAmount.toFixed(2)} ₺</span>
+                        ) : (
+                          <span className="text-muted">0.00 ₺</span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Minimum Alışveriş Bilgisi */}
+                    {cart.coupon.minimumPurchase > 0 && (
+                      <div className="d-flex align-items-center justify-content-between p-2 border-top pt-2">
+                        <small className={isMinimumPurchaseMet ? "text-success" : "text-danger"}>
+                          <FaInfoCircle className="me-1" />
+                          Minimum sepet tutarı: {cart.coupon.minimumPurchase.toFixed(2)} ₺
+                        </small>
+                        {!isMinimumPurchaseMet && (
+                          <small className="text-danger fw-bold">
+                            {(cart.coupon.minimumPurchase - cart.totalPrice).toFixed(2)} ₺ eksik
+                          </small>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Kupon uygulama formu
+                  <>
+                    <InputGroup className="mb-2">
+                      <Form.Control
+                        placeholder="Kupon kodunuzu girin"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={couponLoading}
+                      />
+                      <Button 
+                        variant="outline-success" 
+                        onClick={handleApplyCoupon}
+                        disabled={!couponCode.trim() || couponLoading}
+                      >
+                        {couponLoading ? (
+                          <Spinner animation="border" size="sm" />
+                        ) : (
+                          'Uygula'
+                        )}
+                      </Button>
+                    </InputGroup>
+                    
+                    {/* Form doğrulama hata mesajı */}
+                    {couponValidationError && (
+                      <Alert variant="danger" className="py-2 mb-2 small">
+                        <FaExclamationTriangle className="me-1" />
+                        {couponValidationError}
+                      </Alert>
+                    )}
+                    
+                    {/* API'den dönen hata mesajı */}
+                    {couponError && (
+                      <Alert variant="danger" className="py-3 mb-0">
+                        <div className="d-flex align-items-center mb-2">
+                          <div 
+                            className="bg-white rounded-circle d-flex align-items-center justify-content-center border border-danger me-2" 
+                            style={{ width: '28px', height: '28px', minWidth: '28px' }}
+                          >
+                            <FaExclamationTriangle className="text-danger" size={16} />
+                          </div>
+                          <h6 className="mb-0 fw-bold">
+                            {couponError.includes('bulunamadı') && 'Geçersiz Kupon'}
+                            {couponError.includes('süresi dolmuş') && 'Süresi Dolmuş Kupon'}
+                            {couponError.includes('henüz aktif değil') && 'Aktif Olmayan Kupon'}
+                            {couponError.includes('aktif değil') && !couponError.includes('henüz') && 'Pasif Kupon'}
+                            {couponError.includes('kullanım limiti') && 'Kullanım Limiti Dolmuş'}
+                            {couponError.includes('minimum') && 'Yetersiz Sepet Tutarı'}
+                            {couponError.includes('bağlanılamadı') && 'Bağlantı Hatası'}
+                            {!couponError.includes('bulunamadı') && 
+                             !couponError.includes('süresi dolmuş') && 
+                             !couponError.includes('aktif değil') && 
+                             !couponError.includes('kullanım limiti') && 
+                             !couponError.includes('minimum') &&
+                             !couponError.includes('bağlanılamadı') && 'Kupon Hatası'}
+                          </h6>
+                        </div>
+                        <p className="mb-0 ps-4">{couponError}</p>
+                      </Alert>
+                    )}
+                    
+                    {/* Minimum alışveriş hatırlatması */}
+                    {cart.totalPrice > 0 && (
+                      <div className="mt-2 small text-muted">
+                        <FaTicketAlt className="me-1" />
+                        Mevcut sepet tutarınız: {cart.totalPrice.toFixed(2)} ₺
+                      </div>
+                    )}
+                  </>
+                )}
+              </Card.Body>
+            </Card>
+          
             <Card className="shadow-sm border-0">
               <Card.Header className="bg-success text-white">
                 <h5 className="mb-0">Sipariş Özeti</h5>
@@ -153,6 +352,18 @@ const CartPage = () => {
                   <span>Ara Toplam</span>
                   <span>{cart.totalPrice.toFixed(2)} ₺</span>
                 </div>
+                
+                {cart.coupon && (
+                  <div className="d-flex justify-content-between mb-3">
+                    <span>İndirim</span>
+                    {isMinimumPurchaseMet ? (
+                      <span className="text-success">-{actualDiscountAmount.toFixed(2)} ₺</span>
+                    ) : (
+                      <span className="text-muted">0.00 ₺</span>
+                    )}
+                  </div>
+                )}
+                
                 <div className="d-flex justify-content-between mb-3">
                   <span>Kargo</span>
                   <span>Ücretsiz</span>
@@ -160,10 +371,32 @@ const CartPage = () => {
                 <hr />
                 <div className="d-flex justify-content-between mb-4">
                   <strong>Toplam</strong>
-                  <strong>{cart.totalPrice.toFixed(2)} ₺</strong>
+                  <strong>{finalTotal.toFixed(2)} ₺</strong>
                 </div>
                 
-                <Button variant="success" className="w-100">
+                {/* Kupon uyarıları */}
+                {cart.coupon && !isMinimumPurchaseMet && (
+                  <Alert variant="danger" className="py-2 small mb-3">
+                    <div className="d-flex align-items-start">
+                      <FaExclamationTriangle className="me-2 mt-1" />
+                      <div>
+                        <strong>Minimum alışveriş tutarı karşılanmadı</strong>
+                        <div>
+                          Bu kuponu kullanmak için minimum {cart.coupon.minimumPurchase.toFixed(2)} ₺ tutarında alışveriş yapmalısınız. Şu anki sepet tutarınız: {cart.totalPrice.toFixed(2)} ₺
+                        </div>
+                        <div className="mt-1">
+                          <strong>Eksik tutar: {(cart.coupon.minimumPurchase - cart.totalPrice).toFixed(2)} ₺</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </Alert>
+                )}
+                
+                <Button 
+                  variant="success" 
+                  className="w-100"
+                  disabled={cart.coupon && !isMinimumPurchaseMet}
+                >
                   Ödemeye Geç
                 </Button>
                 

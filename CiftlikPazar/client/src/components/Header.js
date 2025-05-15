@@ -9,7 +9,7 @@ import {
   FaShieldAlt, FaListAlt, FaUserCheck, FaTachometerAlt
 } from 'react-icons/fa';
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = 'http://localhost:3001';
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);

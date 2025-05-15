@@ -19,7 +19,7 @@ const ProducerDetailPage = () => {
   useEffect(() => {
     const fetchProducer = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/farmers/${id}`);
+        const response = await axios.get(`http://localhost:3001/api/farmers/${id}`);
         setProducer(response.data.data);
         setLoading(false);
         
@@ -39,9 +39,9 @@ const ProducerDetailPage = () => {
     const fetchProducts = async () => {
       try {
         setLoadingProducts(true);
-        console.log(`Çiftçi ürünleri için API isteği gönderiliyor: http://localhost:5000/api/products/farmer/${id}`);
+        console.log(`Çiftçi ürünleri için API isteği gönderiliyor: http://localhost:3001/api/products/farmer/${id}`);
         
-        const response = await axios.get(`http://localhost:5000/api/products/farmer/${id}`);
+        const response = await axios.get(`http://localhost:3001/api/products/farmer/${id}`);
         console.log('Çiftçi ürünleri yanıtı:', response.data);
         
         // API yanıtının yapısını kontrol etme
@@ -151,7 +151,7 @@ const ProducerDetailPage = () => {
           `}</style>
           {producer.farmLogo ? (
             <Image 
-              src={`http://localhost:5000/uploads/farm-logos/${producer.farmLogo}`}
+              src={`http://localhost:3001/uploads/farm-logos/${producer.farmLogo}`}
               alt={producer.farmName}
               fluid 
               className="rounded-circle border"
@@ -314,7 +314,7 @@ const ProducerDetailPage = () => {
                     {product.image ? (
                       <Card.Img 
                         variant="top" 
-                        src={`http://localhost:5000/uploads/product-images/${product.image}`}
+                        src={`http://localhost:3001/uploads/product-images/${product.image}`}
                         style={{ height: '180px', objectFit: 'cover' }}
                         onError={(e) => {
                           e.target.onerror = null;

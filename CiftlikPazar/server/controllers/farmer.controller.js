@@ -611,6 +611,9 @@ exports.getAllFarmers = async (req, res) => {
 // @access  Admin
 exports.getPendingFarmers = async (req, res) => {
   try {
+    // Count only parametresi varsa sadece sayı döndür
+    const countOnly = req.query.count_only === 'true';
+    
     // Onay bekleyen çiftçileri bul
     const pendingFarmers = await Farmer.find()
       .populate({
@@ -626,6 +629,13 @@ exports.getPendingFarmers = async (req, res) => {
 
     // Kullanıcısı olmayan veya onaylanmış/reddedilmiş olanları filtrele
     const filteredFarmers = pendingFarmers.filter(farmer => farmer.user !== null);
+
+    if (countOnly) {
+      return res.status(200).json({
+        success: true,
+        count: filteredFarmers.length
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -1371,6 +1381,96 @@ exports.getPublicFarmers = async (req, res) => {
     });
   } catch (error) {
     console.error('Halka açık çiftçi listesi getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
+    });
+  }
+};
+
+// @desc    Onaylanmış çiftçileri getir
+// @route   GET /api/farmers/approved
+// @access  Admin
+exports.getApprovedFarmers = async (req, res) => {
+  try {
+    // Count only parametresi varsa sadece sayı döndür
+    const countOnly = req.query.count_only === 'true';
+    
+    // Onaylanmış çiftçileri bul
+    const approvedFarmers = await Farmer.find()
+      .populate({
+        path: 'user',
+        select: 'firstName lastName email phone approvalStatus createdAt',
+        match: { approvalStatus: 'approved', role: 'farmer' }
+      })
+      .populate({
+        path: 'categories',
+        select: 'category_name'
+      })
+      .sort({ createdAt: -1 });
+
+    // Kullanıcısı olmayan veya onaylanmamış olanları filtrele
+    const filteredFarmers = approvedFarmers.filter(farmer => farmer.user !== null);
+
+    if (countOnly) {
+      return res.status(200).json({
+        success: true,
+        count: filteredFarmers.length
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      count: filteredFarmers.length,
+      data: filteredFarmers
+    });
+  } catch (error) {
+    console.error('Onaylanmış çiftçi listesi getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')
+    });
+  }
+};
+
+// @desc    Reddedilen çiftçileri getir
+// @route   GET /api/farmers/rejected
+// @access  Admin
+exports.getRejectedFarmers = async (req, res) => {
+  try {
+    // Count only parametresi varsa sadece sayı döndür
+    const countOnly = req.query.count_only === 'true';
+    
+    // Reddedilen çiftçileri bul
+    const rejectedFarmers = await Farmer.find()
+      .populate({
+        path: 'user',
+        select: 'firstName lastName email phone approvalStatus createdAt rejectionReason',
+        match: { approvalStatus: 'rejected', role: 'farmer' }
+      })
+      .populate({
+        path: 'categories',
+        select: 'category_name'
+      })
+      .sort({ createdAt: -1 });
+
+    // Kullanıcısı olmayan veya reddedilmemiş olanları filtrele
+    const filteredFarmers = rejectedFarmers.filter(farmer => farmer.user !== null);
+
+    if (countOnly) {
+      return res.status(200).json({
+        success: true,
+        count: filteredFarmers.length
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      count: filteredFarmers.length,
+      data: filteredFarmers
+    });
+  } catch (error) {
+    console.error('Reddedilen çiftçi listesi getirme hatası:', error);
     res.status(500).json({
       success: false,
       message: 'Sunucu hatası: ' + (error.message || 'Bilinmeyen hata')

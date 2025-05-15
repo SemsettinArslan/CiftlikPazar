@@ -6,8 +6,8 @@ import axios from 'axios';
 import { FaUser, FaMapMarkerAlt, FaEnvelope, FaPhoneAlt, FaCamera, FaEdit, FaTrashAlt, FaPlus, FaSave, FaTimes, FaHome, FaBuilding, FaCheck, FaClipboardList, FaAddressCard, FaIdCard, FaExclamationTriangle } from 'react-icons/fa';
 import { getCities, getDistrictsByCityId } from '../services/cityService';
 
-const API_URL = 'http://localhost:5000/api';
-const BASE_URL = 'http://localhost:5000';
+const API_URL = 'http://localhost:3001/api';
+const BASE_URL = 'http://localhost:3001';
 
 const ProfilePage = () => {
   const { user, setUser, isAuthenticated, loading } = useAuth();

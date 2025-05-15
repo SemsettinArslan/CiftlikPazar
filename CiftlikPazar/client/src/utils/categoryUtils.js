@@ -18,7 +18,7 @@ export const fetchCategoryMapping = async () => {
   // Yeni bir istek yap
   fetchPromise = new Promise(async (resolve) => {
     try {
-      const response = await axios.get('http://localhost:5000/api/categories');
+      const response = await axios.get('http://localhost:3001/api/categories');
       
       // API yanıtının yapısına göre veriyi al
       const categories = response.data.data || response.data || [];

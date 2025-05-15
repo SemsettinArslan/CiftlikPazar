@@ -23,7 +23,7 @@ const ProductsList = () => {
         setLoading(true);
         console.log('Ürünler yükleniyor...');
         // Ana ürün listesini getir - çiftçi ID'sini kaldır
-        const response = await axios.get('http://localhost:5000/api/products');
+        const response = await axios.get('http://localhost:3001/api/products');
         console.log('API Yanıtı:', response);
         
         // API yanıtı kontrolü
@@ -51,7 +51,7 @@ const ProductsList = () => {
       try {
         setLoadingCategories(true);
         console.log('Kategoriler yükleniyor...');
-        const response = await axios.get('http://localhost:5000/api/categories');
+        const response = await axios.get('http://localhost:3001/api/categories');
         console.log('Kategoriler API Yanıtı:', response);
         
         // API yanıtı kontrolü

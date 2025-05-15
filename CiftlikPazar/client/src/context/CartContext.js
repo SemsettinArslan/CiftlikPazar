@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import { FaShoppingCart, FaExclamationTriangle, FaTrash, FaStore } from 'react-icons/fa';
+import { FaShoppingCart, FaExclamationTriangle, FaTrash, FaStore, FaTicketAlt } from 'react-icons/fa';
 import { Modal, Button } from 'react-bootstrap';
+import axios from 'axios';
 
 // Context oluştur
 const CartContext = createContext();
@@ -66,15 +67,19 @@ const cartReducer = (state, action) => {
       
       if (!removedItem) return state;
       
-      // Eğer son ürün de kaldırıldıysa currentFarmerId'yi sıfırla
+      // Eğer son ürün de kaldırıldıysa currentFarmerId'yi ve kuponu sıfırla
       const newCurrentFarmerId = filteredItems.length === 0 ? null : state.currentFarmerId;
+      const newCoupon = filteredItems.length === 0 ? null : state.coupon;
+      const newDiscountAmount = filteredItems.length === 0 ? 0 : state.discountAmount;
       
       return {
         ...state,
         items: filteredItems,
         totalItems: state.totalItems - removedItem.quantity,
         totalPrice: state.totalPrice - (removedItem.price * removedItem.quantity),
-        currentFarmerId: newCurrentFarmerId
+        currentFarmerId: newCurrentFarmerId,
+        coupon: newCoupon,
+        discountAmount: newDiscountAmount
       };
 
     case 'UPDATE_QUANTITY':
@@ -99,11 +104,26 @@ const cartReducer = (state, action) => {
       const oldItem = state.items.find(item => item._id === action.payload._id);
       const quantityDifference = updatedItem.quantity - oldItem.quantity;
       
+      // İndirim hesabını tekrar yap
+      let discountAmount = state.discountAmount;
+      const newTotalPrice = state.totalPrice + (quantityDifference * updatedItem.price);
+      
+      if (state.coupon) {
+        // Kupon yüzdelik ise yeniden hesapla, sabit ise aynı kalır
+        if (state.coupon.type === 'percentage') {
+          discountAmount = Math.min(
+            (newTotalPrice * state.coupon.value) / 100,
+            state.coupon.maximumDiscountAmount || Infinity
+          );
+        }
+      }
+      
       return {
         ...state,
         items: updatedItems,
         totalItems: state.totalItems + quantityDifference,
-        totalPrice: state.totalPrice + (quantityDifference * updatedItem.price)
+        totalPrice: newTotalPrice,
+        discountAmount: discountAmount
       };
 
     case 'CLEAR_CART':
@@ -111,12 +131,28 @@ const cartReducer = (state, action) => {
         items: [],
         totalItems: 0,
         totalPrice: 0,
-        currentFarmerId: null
+        currentFarmerId: null,
+        coupon: null,
+        discountAmount: 0
       };
       
     case 'REPLACE_CART':
       return {
         ...action.payload
+      };
+      
+    case 'APPLY_COUPON':
+      return {
+        ...state,
+        coupon: action.payload.coupon,
+        discountAmount: action.payload.discountAmount
+      };
+      
+    case 'REMOVE_COUPON':
+      return {
+        ...state,
+        coupon: null,
+        discountAmount: 0
       };
 
     default:
@@ -130,7 +166,9 @@ export const CartProvider = ({ children }) => {
     items: [],
     totalItems: 0,
     totalPrice: 0,
-    currentFarmerId: null
+    currentFarmerId: null,
+    coupon: null,
+    discountAmount: 0
   };
 
   // LocalStorage'dan sepet verisini yükle
@@ -150,6 +188,8 @@ export const CartProvider = ({ children }) => {
   const [pendingProduct, setPendingProduct] = useState(null);
   const [existingFarmerName, setExistingFarmerName] = useState('');
   const [newFarmerName, setNewFarmerName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Sepet değiştiğinde localStorage'a kaydet
   useEffect(() => {
@@ -248,34 +288,19 @@ export const CartProvider = ({ children }) => {
     
     toast.info(
       <div className="d-flex align-items-center">
-        <FaShoppingCart className="me-2" />
+        <FaTrash className="me-2" />
         <span>{product.name} sepetten çıkarıldı</span>
       </div>
     );
   };
 
   const updateQuantity = (product, quantity) => {
-    if (quantity < 1) {
-      removeFromCart(product);
-      return;
-    }
-    
-    // Stok limiti kontrolü
-    const stockLimit = product.countInStock || 0;
-    if (quantity > stockLimit) {
-      toast.warning(
-        <div className="d-flex align-items-center">
-          <FaExclamationTriangle className="me-2" />
-          <span>Üzgünüz, "{product.name}" ürününün stok limiti: {stockLimit}</span>
-        </div>
-      );
-      // Stok limitini aşmayacak şekilde ayarla
-      quantity = stockLimit;
-    }
+    // Geçersiz değerler için kontrol
+    if (quantity < 1) quantity = 1;
     
     dispatch({
       type: 'UPDATE_QUANTITY',
-      payload: { ...product, quantity }
+      payload: { _id: product._id, quantity }
     });
   };
 
@@ -285,7 +310,7 @@ export const CartProvider = ({ children }) => {
     toast.info(
       <div className="d-flex align-items-center">
         <FaShoppingCart className="me-2" />
-        <span>Sepet temizlendi</span>
+        <span>Sepetiniz temizlendi</span>
       </div>
     );
   };
@@ -295,71 +320,165 @@ export const CartProvider = ({ children }) => {
   };
 
   const getCartTotal = () => {
-    return state.totalPrice;
+    return state.totalPrice - state.discountAmount;
+  };
+  
+  // Kupon işlemleri
+  const applyCoupon = async (couponCode) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // API URL'i tam olarak belirt
+      const response = await axios.post('http://localhost:3001/api/coupons/check', {
+        code: couponCode,
+        cartTotal: state.totalPrice
+      });
+      
+      if (response.data.success) {
+        const { coupon, discountAmount } = response.data.data;
+        
+        dispatch({
+          type: 'APPLY_COUPON',
+          payload: { coupon, discountAmount }
+        });
+        
+        toast.success(
+          <div className="d-flex align-items-center">
+            <FaTicketAlt className="me-2" />
+            <span>{coupon.code} kuponu başarıyla uygulandı. {discountAmount.toFixed(2)} ₺ indirim kazandınız!</span>
+          </div>
+        );
+        
+        return true;
+      }
+    } catch (error) {
+      console.error('Kupon hatası:', error);
+      
+      // Hata mesajını daha güvenilir şekilde al
+      let errorMessage = 'Kupon uygulanırken bir hata oluştu.';
+      
+      if (error.response) {
+        // Server yanıtı ile gelen hata (4xx, 5xx)
+        console.log('Hata yanıtı:', error.response);
+        errorMessage = error.response.data?.message || 
+                      (error.response.data?.error?.message) || 
+                      `Hata kodu: ${error.response.status}`;
+      } else if (error.request) {
+        // İstek yapıldı ama yanıt alınamadı
+        errorMessage = 'Sunucuya bağlanılamadı. Lütfen bağlantınızı kontrol edin.';
+      } else {
+        // İstek oluşturulurken hata
+        errorMessage = error.message || 'Bilinmeyen bir hata oluştu.';
+      }
+      
+      setError(errorMessage);
+      
+      // Hata tipine göre özel başlıklar
+      let title = 'Kupon Hatası';
+      
+      if (errorMessage.includes('bulunamadı')) {
+        title = 'Geçersiz Kupon';
+      } else if (errorMessage.includes('süresi dolmuş')) {
+        title = 'Süresi Dolmuş';
+      } else if (errorMessage.includes('aktif değil')) {
+        title = 'Pasif Kupon';
+      } else if (errorMessage.includes('kullanım limiti')) {
+        title = 'Limit Dolmuş';
+      } else if (errorMessage.includes('minimum')) {
+        title = 'Yetersiz Tutar';
+      }
+      
+      toast.error(
+        <div>
+          <div className="d-flex align-items-center fw-bold mb-1">
+            <FaExclamationTriangle className="me-2 text-danger" />
+            <span>{title}</span>
+          </div>
+          <div className="ms-4">{errorMessage}</div>
+        </div>
+      );
+      
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const removeCoupon = () => {
+    dispatch({ type: 'REMOVE_COUPON' });
+    
+    toast.info(
+      <div className="d-flex align-items-center">
+        <FaTicketAlt className="me-2" />
+        <span>Kupon kaldırıldı</span>
+      </div>
+    );
+  };
+
+  // Modal bileşeni
+  const farmerChangeModal = (
+    <Modal show={showConfirmModal} onHide={handleCancelNewFarmer} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>Farklı Çiftlikten Ürün</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <div className="d-flex align-items-center mb-3">
+          <FaStore className="text-warning me-2" size={22} />
+          <div>
+            <p className="mb-0">
+              Sepetinizde zaten <strong>{existingFarmerName}</strong>'den ürünler var.
+            </p>
+            <p className="mb-0">
+              <strong>{newFarmerName}</strong>'den ürün eklemek için sepetiniz temizlenecek.
+            </p>
+          </div>
+        </div>
+        <p className="text-danger mb-0">Devam etmek istiyor musunuz?</p>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="light" onClick={handleCancelNewFarmer}>
+          Vazgeç
+        </Button>
+        <Button variant="success" onClick={handleConfirmNewFarmer}>
+          Sepeti Temizle ve Ekle
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+  
+  // Context değeri
+  const contextValue = {
+    cart: {
+      ...state,
+      finalTotal: getCartTotal()
+    },
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    getCartItemCount,
+    getCartTotal,
+    applyCoupon,
+    removeCoupon,
+    couponLoading: loading,
+    couponError: error
   };
 
   return (
-    <>
-      <CartContext.Provider
-        value={{
-          cart: state,
-          addToCart,
-          removeFromCart,
-          updateQuantity,
-          clearCart,
-          getCartItemCount,
-          getCartTotal
-        }}
-      >
-        {children}
-      </CartContext.Provider>
-      
-      {/* Farklı çiftlik onay modalı */}
-      <Modal 
-        show={showConfirmModal} 
-        onHide={handleCancelNewFarmer}
-        centered
-        backdrop="static"
-      >
-        <Modal.Header className="bg-success text-white">
-          <Modal.Title>
-            <FaExclamationTriangle className="me-2" />
-            Sepet Uyarısı
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="py-4">
-          <div className="d-flex flex-column">
-            <p className="mb-3">
-              Sepetinizde <strong>{existingFarmerName}</strong> çiftliğinden ürünler bulunmaktadır.
-            </p>
-            <p className="mb-3">
-              <strong>{newFarmerName}</strong> çiftliğinden ürün eklemek için mevcut sepetiniz temizlenecektir.
-            </p>
-            <p className="mb-0">
-              Devam etmek istiyor musunuz?
-            </p>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={handleCancelNewFarmer}>
-            İptal
-          </Button>
-          <Button variant="success" onClick={handleConfirmNewFarmer}>
-            <FaTrash className="me-2" />
-            Sepeti Temizle ve Devam Et
-          </Button>
-        </Modal.Footer>
-      </Modal>
-    </>
+    <CartContext.Provider value={contextValue}>
+      {children}
+      {farmerChangeModal}
+    </CartContext.Provider>
   );
 };
 
-// Özel hook
 export const useCart = () => {
   const context = useContext(CartContext);
   if (!context) {
     throw new Error('useCart hook must be used within a CartProvider');
   }
+  
   return context;
 };
 

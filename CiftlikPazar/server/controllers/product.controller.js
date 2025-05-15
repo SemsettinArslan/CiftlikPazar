@@ -1,19 +1,25 @@
 const Product = require('../models/Product');
 const Farmer = require('../models/farmer.model');
+const Category = require('../models/category.model');
+const { verifyProduct } = require('../utils/geminiAI');
 
-// Tüm ürünleri getir
+// Tüm ürünleri getir (sadece onaylı ürünler)
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find({})
+    const products = await Product.find({ approvalStatus: 'approved' })
       .populate({
         path: 'farmer',
         select: 'farmName city district description'
       });
     
-    res.json(products);
+    res.json({
+      success: true,
+      count: products.length,
+      data: products
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 };
 
@@ -27,13 +33,16 @@ exports.getProductById = async (req, res) => {
       });
     
     if (!product) {
-      return res.status(404).json({ message: 'Ürün bulunamadı' });
+      return res.status(404).json({ success: false, message: 'Ürün bulunamadı' });
     }
     
-    res.json(product);
+    res.json({
+      success: true,
+      data: product
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 };
 
@@ -47,14 +56,66 @@ exports.createProduct = async (req, res) => {
       image,
       category,
       countInStock,
-      unit
+      unit,
+      isOrganic
     } = req.body;
 
     // Çiftçi ID'sini kullanıcı ID'si ile ilişkilendirilen çiftçi profilinden alıyoruz
     const farmer = await Farmer.findOne({ user: req.user.id });
     
     if (!farmer) {
-      return res.status(400).json({ message: 'Geçerli bir çiftçi profili bulunamadı' });
+      return res.status(400).json({ success: false, message: 'Geçerli bir çiftçi profili bulunamadı' });
+    }
+
+    // Gemini AI doğrulaması için kategori adını al
+    let categoryName = '';
+    if (category) {
+      const categoryDoc = await Category.findById(category);
+      if (categoryDoc) {
+        categoryName = categoryDoc.category_name || categoryDoc.name;
+      }
+    }
+
+    // Ürünü oluşturmadan önce otomatik Gemini AI doğrulaması yap
+    let approvalStatus = 'pending'; // varsayılan onay durumu
+    let verificationResult = null;
+    let verificationReason = null;
+
+    // Sadece görsel varsa doğrulama yap
+    if (image && name && description) {
+      try {
+        // Gemini API ile ürün doğrulama
+        verificationResult = await verifyProduct(name, description, categoryName, image);
+        
+        console.log("Gemini AI Doğrulama Sonucu:", verificationResult);
+        
+        // Doğrulama sonucuna göre onay durumunu belirle
+        if (verificationResult.autoApproved === true && verificationResult.isValid === true) {
+          approvalStatus = 'approved'; // Otomatik onay
+          verificationReason = "AI tarafından doğrulandı: " + verificationResult.reason;
+        } else {
+          // Ürün doğrulanmadı veya güven skoru düşük, manuel incelemeye alınacak
+          approvalStatus = 'pending';
+          
+          if (verificationResult.isValid === false) {
+            // İsim problemiyle ilgili özel mesaj kontrolü
+            if (verificationResult.reason.toLowerCase().includes("ürün adı") || 
+                verificationResult.reason.toLowerCase().includes("isim")) {
+              verificationReason = "AI doğrulaması başarısız - Ürün adı uyumsuz: " + verificationResult.reason;
+            } else {
+              verificationReason = "AI doğrulaması başarısız: " + verificationResult.reason;
+            }
+          } else {
+            // isValid true ama güven skoru düşük olabilir
+            verificationReason = "Doğrulama sonuçları tam güvenilir değil: " + verificationResult.reason;
+          }
+        }
+      } catch (aiError) {
+        console.error("Ürün doğrulama hatası:", aiError);
+        verificationReason = "Doğrulama işlemi sırasında bir hata oluştu";
+        // Hata durumunda manuel onaya düşsün
+        approvalStatus = 'pending';
+      }
     }
 
     const product = await Product.create({
@@ -65,13 +126,27 @@ exports.createProduct = async (req, res) => {
       category,
       countInStock,
       unit,
-      farmer: farmer._id
+      isOrganic: isOrganic || false,
+      farmer: farmer._id,
+      approvalStatus: approvalStatus, // Güncellendi - Gemini AI otomatik onayı
+      approvalDate: approvalStatus === 'approved' ? Date.now() : undefined,
+      rejectionReason: approvalStatus === 'rejected' ? verificationReason : undefined
     });
 
-    res.status(201).json(product);
+    // Yanıta doğrulama sonucunu ekle
+    const responseMessage = approvalStatus === 'approved' 
+      ? 'Ürün başarıyla kaydedildi ve otomatik olarak onaylandı.' 
+      : 'Ürün başarıyla kaydedildi ve onay için gönderildi.';
+
+    res.status(201).json({
+      success: true,
+      message: responseMessage,
+      data: product,
+      verification: verificationResult // İsteğe bağlı - frontend'e doğrulama detaylarını göndermek için
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 };
 
@@ -85,13 +160,14 @@ exports.updateProduct = async (req, res) => {
       image,
       category,
       countInStock,
-      unit
+      unit,
+      isOrganic
     } = req.body;
 
     const product = await Product.findById(req.params.id);
     
     if (!product) {
-      return res.status(404).json({ message: 'Ürün bulunamadı' });
+      return res.status(404).json({ success: false, message: 'Ürün bulunamadı' });
     }
 
     // Çiftçi ID'sini bulma
@@ -99,7 +175,74 @@ exports.updateProduct = async (req, res) => {
     
     // Ürünün sahibi olan çiftçi veya admin değilse güncellemeye izin verme
     if (farmer && farmer._id.toString() !== product.farmer.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+      return res.status(403).json({ success: false, message: 'Bu işlem için yetkiniz yok' });
+    }
+
+    // Ürün adı, açıklama veya görsel değiştiyse Gemini AI doğrulaması yap
+    let newApprovalStatus = product.approvalStatus;
+    let verificationResult = null;
+    let verificationReason = null;
+    
+    const isChanged = (name && name !== product.name) || 
+                      (description && description !== product.description) || 
+                      (image && image !== product.image) ||
+                      (category && category.toString() !== product.category.toString());
+
+    // Önemli alanlardan biri değiştiyse ve mevcut AI değerleri varsa
+    if (isChanged) {
+      // Gemini AI doğrulaması için kategori adını al
+      let categoryName = '';
+      let categoryId = category || product.category;
+      
+      if (categoryId) {
+        const categoryDoc = await Category.findById(categoryId);
+        if (categoryDoc) {
+          categoryName = categoryDoc.category_name || categoryDoc.name;
+        }
+      }
+      
+      // Değiştirilen veya mevcut değerleri kullan
+      const productName = name || product.name;
+      const productDesc = description || product.description;
+      const productImage = image || product.image;
+      
+      // Gemini AI ile ürün doğrulama
+      try {
+        if (productImage && productName && productDesc) {
+          verificationResult = await verifyProduct(productName, productDesc, categoryName, productImage);
+          
+          console.log("Gemini AI Güncelleme Doğrulama Sonucu:", verificationResult);
+          
+          // Doğrulama sonucuna göre onay durumunu belirle
+          if (verificationResult.autoApproved === true && verificationResult.isValid === true) {
+            newApprovalStatus = 'approved'; // Otomatik onay
+            verificationReason = "AI tarafından doğrulandı: " + verificationResult.reason;
+          } else {
+            // Ürün doğrulanmadı veya güven skoru düşük, manuel incelemeye alınacak
+            newApprovalStatus = 'pending';
+            
+            if (verificationResult.isValid === false) {
+              // İsim problemiyle ilgili özel mesaj kontrolü
+              if (verificationResult.reason.toLowerCase().includes("ürün adı") || 
+                  verificationResult.reason.toLowerCase().includes("isim")) {
+                verificationReason = "AI doğrulaması başarısız - Ürün adı uyumsuz: " + verificationResult.reason;
+              } else {
+                verificationReason = "AI doğrulaması başarısız: " + verificationResult.reason;
+              }
+            } else {
+              // isValid true ama güven skoru düşük olabilir
+              verificationReason = "Doğrulama sonuçları tam güvenilir değil: " + verificationResult.reason;
+            }
+          }
+        } else {
+          // Eksik veriler olduğunda manuel inceleme
+          newApprovalStatus = 'pending';
+        }
+      } catch (aiError) {
+        console.error("Ürün güncelleme doğrulama hatası:", aiError);
+        // Hata durumunda manuel onaya düşsün
+        newApprovalStatus = 'pending';
+      }
     }
 
     product.name = name || product.name;
@@ -107,15 +250,36 @@ exports.updateProduct = async (req, res) => {
     product.price = price || product.price;
     product.image = image || product.image;
     product.category = category || product.category;
-    product.countInStock = countInStock || product.countInStock;
+    product.countInStock = countInStock !== undefined ? countInStock : product.countInStock;
     product.unit = unit || product.unit;
+    product.isOrganic = isOrganic !== undefined ? isOrganic : product.isOrganic;
+    product.approvalStatus = newApprovalStatus;
+
+    if (newApprovalStatus === 'approved' && isChanged) {
+      product.approvalDate = Date.now();
+      product.rejectionReason = undefined;
+    } else if (newApprovalStatus === 'pending') {
+      product.rejectionReason = undefined;
+    }
 
     const updatedProduct = await product.save();
     
-    res.json(updatedProduct);
+    // Yanıta doğrulama sonucunu ekle
+    const responseMessage = newApprovalStatus === 'approved' 
+      ? 'Ürün güncellendi ve otomatik olarak onaylandı.' 
+      : newApprovalStatus === 'pending'
+        ? 'Ürün güncellendi ve tekrar onay için gönderildi.'
+        : 'Ürün başarıyla güncellendi.';
+
+    res.json({
+      success: true,
+      message: responseMessage,
+      data: updatedProduct,
+      verification: verificationResult // İsteğe bağlı - frontend'e doğrulama detaylarını göndermek için
+    });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 };
 
@@ -125,7 +289,7 @@ exports.deleteProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
     
     if (!product) {
-      return res.status(404).json({ message: 'Ürün bulunamadı' });
+      return res.status(404).json({ success: false, message: 'Ürün bulunamadı' });
     }
 
     // Çiftçi ID'sini bulma
@@ -133,15 +297,15 @@ exports.deleteProduct = async (req, res) => {
     
     // Ürünün sahibi olan çiftçi veya admin değilse silmeye izin verme
     if (farmer && farmer._id.toString() !== product.farmer.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+      return res.status(403).json({ success: false, message: 'Bu işlem için yetkiniz yok' });
     }
 
     await product.deleteOne();
     
-    res.json({ message: 'Ürün silindi' });
+    res.json({ success: true, message: 'Ürün silindi' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    res.status(500).json({ success: false, message: 'Sunucu hatası' });
   }
 };
 
@@ -151,7 +315,10 @@ exports.getFeaturedProducts = async (req, res) => {
     // Limit parametresi, kaç ürün döndürüleceğini belirler (varsayılan 4)
     const limit = parseInt(req.query.limit) || 4;
 
-    const featuredProducts = await Product.find({ isFeatured: true })
+    const featuredProducts = await Product.find({ 
+      isFeatured: true,
+      approvalStatus: 'approved' // Sadece onaylı ürünler gösterilir
+    })
       .limit(limit)
       .populate({
         path: 'farmer',
@@ -173,7 +340,7 @@ exports.getFeaturedProducts = async (req, res) => {
   }
 };
 
-// Belirli bir çiftçiye ait ürünleri getir
+// Belirli bir çiftçiye ait ürünleri getir (sadece onaylı olanlar - müşteriler için)
 exports.getProductsByFarmer = async (req, res) => {
   try {
     const farmerId = req.params.farmerId;
@@ -187,7 +354,11 @@ exports.getProductsByFarmer = async (req, res) => {
       });
     }
     
-    const products = await Product.find({ farmer: farmerId })
+    // Sadece onaylı ürünleri göster
+    const products = await Product.find({ 
+      farmer: farmerId,
+      approvalStatus: 'approved'
+    })
       .populate({
         path: 'farmer',
         select: 'farmName city district description'
@@ -204,6 +375,219 @@ exports.getProductsByFarmer = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: 'Sunucu hatası' 
+    });
+  }
+};
+
+// Çiftçinin kendi ürünlerini getir (tüm durumlar - çiftçi için)
+exports.getMyProducts = async (req, res) => {
+  try {
+    // Çiftçi kontrolü
+    const farmer = await Farmer.findOne({ user: req.user.id });
+    if (!farmer) {
+      return res.status(404).json({
+        success: false,
+        message: 'Üretici profili bulunamadı'
+      });
+    }
+    
+    // Query parametreleri
+    const { status } = req.query;
+    let query = { farmer: farmer._id };
+    
+    // Eğer durum filtresi varsa ekle
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      query.approvalStatus = status;
+    }
+    
+    const products = await Product.find(query)
+      .populate('category', 'category_name')
+      .sort({ createdAt: -1 }); // En yeni eklenenler üstte
+    
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products
+    });
+  } catch (error) {
+    console.error('Kendi ürünlerini getirme hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
+};
+
+// Onay bekleyen ürünleri getir (admin için)
+exports.getPendingProducts = async (req, res) => {
+  try {
+    const pendingProducts = await Product.find({ approvalStatus: 'pending' })
+      .populate({
+        path: 'farmer',
+        select: 'farmName city district user',
+        populate: { path: 'user', select: 'firstName lastName email' }
+      })
+      .populate('category', 'category_name')
+      .sort({ createdAt: -1 }); // En yeni eklenenler üstte
+    
+    res.status(200).json({
+      success: true,
+      count: pendingProducts.length,
+      data: pendingProducts
+    });
+  } catch (error) {
+    console.error('Onay bekleyen ürünleri getirme hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
+};
+
+// Ürün onaylama (admin için)
+exports.approveProduct = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ürün bulunamadı'
+      });
+    }
+    
+    if (product.approvalStatus === 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu ürün zaten onaylanmış'
+      });
+    }
+    
+    product.approvalStatus = 'approved';
+    product.approvalDate = Date.now();
+    product.rejectionReason = null;
+    
+    await product.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Ürün başarıyla onaylandı',
+      data: product
+    });
+  } catch (error) {
+    console.error('Ürün onaylama hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
+};
+
+// Ürün reddetme (admin için)
+exports.rejectProduct = async (req, res) => {
+  try {
+    const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Red sebebi belirtilmelidir'
+      });
+    }
+    
+    const product = await Product.findById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ürün bulunamadı'
+      });
+    }
+    
+    product.approvalStatus = 'rejected';
+    product.rejectionReason = reason;
+    product.approvalDate = Date.now();
+    
+    await product.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Ürün reddedildi',
+      data: product
+    });
+  } catch (error) {
+    console.error('Ürün reddetme hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
+};
+
+// Admin için durum bazlı ürün listesi getir (onaylı, reddedilmiş veya tümü)
+exports.getAdminProductsByStatus = async (req, res) => {
+  try {
+    // Query parametrelerinden status değerini al
+    const { status } = req.query;
+    
+    // Status değeri geçerliyse filtreleme yap, değilse tüm ürünleri getir
+    let query = {};
+    
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) {
+      query.approvalStatus = status;
+    }
+    
+    const products = await Product.find(query)
+      .populate({
+        path: 'farmer',
+        select: 'farmName city district user',
+        populate: { path: 'user', select: 'firstName lastName email' }
+      })
+      .populate('category', 'category_name')
+      .sort({ approvalDate: -1, createdAt: -1 }); // En son işlem yapılanlar üstte
+    
+    res.status(200).json({
+      success: true,
+      count: products.length,
+      data: products
+    });
+  } catch (error) {
+    console.error('Admin ürün listesi getirme hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
+};
+
+// Ürün görseli yükleme
+exports.uploadProductImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lütfen bir görsel dosyası yükleyin'
+      });
+    }
+
+    // Sadece dosya adını kullan, tam yol değil
+    // Bu şekilde tekrarlayan uploads/product-images/ sorunu çözülür
+    const imagePath = req.file.filename;
+    
+    console.log('Yüklenen dosya adı:', imagePath);
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Görsel başarıyla yüklendi',
+      data: {
+        imagePath: imagePath
+      }
+    });
+  } catch (error) {
+    console.error('Görsel yükleme hatası:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Görsel yüklenirken bir hata oluştu'
     });
   }
 }; 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Table, Badge, Button, Spinner, Modal, Form, Alert } from 'react-bootstrap';
-import { FaCheck, FaTimes, FaEye, FaArrowLeft, FaMapMarkerAlt, FaPhoneAlt, FaEnvelope, FaIdCard, FaBoxes, FaTractor, FaClipboardCheck, FaUser, FaCalendarAlt, FaInfoCircle, FaTruck, FaCertificate } from 'react-icons/fa';
+import { FaCheck, FaTimes, FaEye, FaArrowLeft, FaMapMarkerAlt, FaPhoneAlt, FaEnvelope, FaIdCard, FaBoxes, FaTractor, FaClipboardCheck, FaUser, FaCalendarAlt, FaInfoCircle, FaTruck, FaCertificate, FaExclamationCircle } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -205,6 +205,26 @@ const AdminFarmerRequestsPage = () => {
             <FaArrowLeft className="me-2" /> Admin Paneline Dön
           </Button>
         </div>
+        
+        <Alert variant="info" className="d-flex align-items-center mb-4">
+          <FaExclamationCircle className="me-2" size={16} />
+          <div>
+            <strong>Bilgi:</strong> Çiftçi başvuru yönetimi artık Admin Paneli içerisine taşınmıştır. 
+            <Button 
+              as={Link} 
+              to="/admin/dashboard" 
+              variant="outline-info" 
+              size="sm" 
+              className="ms-3"
+              onClick={(e) => {
+                // Admin panelindeki farmer-approvals sekmesini açmak için sessionStorage'a bilgi ekleyelim
+                sessionStorage.setItem('adminActiveTab', 'farmer-approvals');
+              }}
+            >
+              Admin Panelindeki Çiftçi Onay Sayfasına Git
+            </Button>
+          </div>
+        </Alert>
         
         {alertInfo.show && (
           <Alert 

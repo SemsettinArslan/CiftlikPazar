@@ -44,7 +44,7 @@ const ProductCard = ({ product }) => {
           {product.image ? (
             <Card.Img 
               variant="top" 
-              src={`http://localhost:5000/uploads/product-images/${product.image}`}
+              src={`http://localhost:3001/uploads/product-images/${product.image}`}
               alt={product.name}
               style={{ height: '200px', objectFit: 'cover' }}
               onError={(e) => {

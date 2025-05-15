@@ -7,6 +7,8 @@ const {
   completeRegistration,
   getAllFarmers,
   getPendingFarmers,
+  getApprovedFarmers,
+  getRejectedFarmers,
   approveFarmer,
   addCertificate,
   getCertificates,
@@ -41,6 +43,12 @@ router.route('/me')
 // Admin rotaları - ÖNEMLİ: Spesifik rotalar /:id gibi genel rotalardan ÖNCE gelmeli
 router.route('/pending')
   .get(protect, authorize('admin'), getPendingFarmers);
+
+router.route('/approved')
+  .get(protect, authorize('admin'), getApprovedFarmers);
+
+router.route('/rejected')
+  .get(protect, authorize('admin'), getRejectedFarmers);  
   
 router.route('/:id/approve')
   .put(protect, authorize('admin'), approveFarmer);

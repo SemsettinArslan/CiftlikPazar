@@ -7,6 +7,8 @@ import { toast } from 'react-toastify';
 import { FaShoppingCart, FaPlus, FaMinus, FaTag, FaStore, FaInfoCircle, FaMapMarkerAlt, FaArrowLeft } from 'react-icons/fa';
 import { getCategoryNameById } from '../utils/categoryUtils';
 
+const API_URL = 'http://localhost:3001';
+
 const ProductPage = () => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
@@ -20,17 +22,26 @@ const ProductPage = () => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
-        const { data } = await axios.get(`/api/products/${id}`);
-        setProduct(data);
+        const response = await axios.get(`${API_URL}/api/products/${id}`);
+        
+        // API yanıt formatı değişmiş olabilir, veriyi güvenli bir şekilde çıkaralım
+        const productData = response.data?.data || response.data;
+        
+        if (!productData) {
+          throw new Error('Ürün verisi bulunamadı');
+        }
+        
+        setProduct(productData);
         
         // Kategori ismini getir
-        if (data.category) {
-          const name = await getCategoryNameById(data.category);
+        if (productData.category) {
+          const name = await getCategoryNameById(productData.category);
           setCategoryName(name);
         }
         
         setLoading(false);
       } catch (err) {
+        console.error('Ürün getirme hatası:', err);
         setError(err.response?.data?.message || 'Ürün yüklenirken bir hata oluştu');
         setLoading(false);
       }
@@ -69,6 +80,53 @@ const ProductPage = () => {
     }
   };
 
+  // Resim URL'i için yardımcı fonksiyon
+  const getImageUrl = (imageName) => {
+    if (!imageName) return 'https://via.placeholder.com/600x400?text=Resim+Yok';
+    return `${API_URL}/uploads/product-images/${imageName}`;
+  };
+
+  // Farmer ID güvenli bir şekilde al
+  const getFarmerId = () => {
+    if (!product) return null;
+    if (product.farmer && typeof product.farmer === 'object' && product.farmer._id) {
+      return product.farmer._id;
+    }
+    if (product.farmer && typeof product.farmer === 'string') {
+      return product.farmer;
+    }
+    return null;
+  };
+
+  // Çiftlik adını güvenli bir şekilde al
+  const getFarmName = () => {
+    if (!product) return 'Bilinmeyen Üretici';
+    if (product.farmer && typeof product.farmer === 'object') {
+      return product.farmer.farmName || 'Bilinmeyen Üretici';
+    }
+    return 'Bilinmeyen Üretici';
+  };
+
+  // Çiftlik şehir ve ilçe bilgisini güvenli bir şekilde al
+  const getFarmLocation = () => {
+    if (!product || !product.farmer || typeof product.farmer !== 'object') {
+      return 'Belirtilmemiş';
+    }
+    
+    const city = product.farmer.city || '';
+    const district = product.farmer.district || '';
+    
+    if (city && district) {
+      return `${city}, ${district}`;
+    } else if (city) {
+      return city;
+    } else if (district) {
+      return district;
+    }
+    
+    return 'Belirtilmemiş';
+  };
+
   if (loading) return (
     <div className="d-flex justify-content-center align-items-center py-5">
       <div className="spinner-border text-success" role="status">
@@ -90,6 +148,8 @@ const ProductPage = () => {
       Ürün bulunamadı
     </div>
   );
+
+  const farmerId = getFarmerId();
 
   return (
     <Container className="py-5">
@@ -117,20 +177,26 @@ const ProductPage = () => {
                 </span>
               )}
               <Image 
-                src={`/uploads/product-images/${product.image}`} 
+                src={getImageUrl(product.image)} 
                 alt={product.name} 
                 className="img-fluid h-100 object-fit-cover"
                 style={{ objectPosition: 'center' }}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'https://via.placeholder.com/600x400?text=Resim+Yok';
+                }}
               />
             </div>
           </Col>
           <Col lg={6}>
             <div className="p-4 p-lg-5">
               <h2 className="fw-bold mb-2">{product.name}</h2>
-              <Link to={`/producer/${product.farmer._id}`} className="text-decoration-none text-muted d-inline-block mb-3">
-                <FaStore className="me-2" />
-                {product.farmer.farmName}
-              </Link>
+              {farmerId && (
+                <Link to={`/producer/${farmerId}`} className="text-decoration-none text-muted d-inline-block mb-3">
+                  <FaStore className="me-2" />
+                  {getFarmName()}
+                </Link>
+              )}
               
               {/* Kategori bilgisi */}
               {(product.category || categoryName) && (
@@ -151,7 +217,7 @@ const ProductPage = () => {
               
               <div className="my-4">
                 <h3 className="text-success fw-bold mb-0">
-                  {product.price.toFixed(2)} ₺
+                  {product.price?.toFixed(2)} ₺
                   <span className="text-muted fs-6 fw-normal ms-2">/ {product.unit}</span>
                 </h3>
               </div>
@@ -217,36 +283,37 @@ const ProductPage = () => {
         </Row>
       </div>
 
-      <Row className="mt-5">
-        <Col lg={8} className="mx-auto">
-          <Card className="border-0 shadow-sm rounded-3 overflow-hidden">
-            <Card.Header className="bg-success text-white py-3 px-4">
-              <h5 className="mb-0">
-                <FaInfoCircle className="me-2" />
-                Üretici Hakkında
-              </h5>
-            </Card.Header>
-            <Card.Body className="p-4">
-              <Card.Title className="fs-4 mb-3">{product.farmer.farmName}</Card.Title>
-              <Card.Text className="mb-3">
-                <FaMapMarkerAlt className="me-2 text-success" />
-                <strong>Konum:</strong> {product.farmer.city || 'Belirtilmemiş'}
-                {product.farmer.district ? `, ${product.farmer.district}` : ''}
-              </Card.Text>
-              <Card.Text className="mb-4">
-                {product.farmer.description || 'Üretici hakkında açıklama bulunmamaktadır.'}
-              </Card.Text>
-              
-              <Link to={`/producer/${product.farmer._id}`}>
-                <Button variant="outline-success" className="px-4 rounded-pill">
-                  <FaStore className="me-2" />
-                  Çiftlik Profiline Git
-                </Button>
-              </Link>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      {farmerId && (
+        <Row className="mt-5">
+          <Col lg={8} className="mx-auto">
+            <Card className="border-0 shadow-sm rounded-3 overflow-hidden">
+              <Card.Header className="bg-success text-white py-3 px-4">
+                <h5 className="mb-0">
+                  <FaInfoCircle className="me-2" />
+                  Üretici Hakkında
+                </h5>
+              </Card.Header>
+              <Card.Body className="p-4">
+                <Card.Title className="fs-4 mb-3">{getFarmName()}</Card.Title>
+                <Card.Text className="mb-3">
+                  <FaMapMarkerAlt className="me-2 text-success" />
+                  <strong>Konum:</strong> {getFarmLocation()}
+                </Card.Text>
+                <Card.Text className="mb-4">
+                  {product.farmer?.description || 'Üretici hakkında açıklama bulunmamaktadır.'}
+                </Card.Text>
+                
+                <Link to={`/producer/${farmerId}`}>
+                  <Button variant="outline-success" className="px-4 rounded-pill">
+                    <FaStore className="me-2" />
+                    Çiftlik Profiline Git
+                  </Button>
+                </Link>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       {/* Hide number input arrows */}
       <style jsx="true">{`
