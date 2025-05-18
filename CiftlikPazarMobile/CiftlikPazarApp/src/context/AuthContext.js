@@ -258,12 +258,13 @@ export const AuthProvider = ({ children }) => {
       setUser(data);
       
       // Kullanıcı rolüne göre yönlendirme
-      if (data.data && data.data.role === 'farmer') {
-        console.log('Çiftçi kullanıcısı tespit edildi, çiftçi paneline yönlendiriliyor');
+      console.log('Kullanıcı rolü:', data.data.role);
+      
+      if (data.data.role === 'admin') {
+        router.replace('/admin-dashboard');
+      } else if (data.data.role === 'farmer') {
         router.replace('/farmer-dashboard');
       } else {
-        // Normal kullanıcıları ana sayfaya yönlendir
-        console.log('Normal kullanıcı tespit edildi, ana sayfaya yönlendiriliyor');
         router.replace('/(tabs)');
       }
       

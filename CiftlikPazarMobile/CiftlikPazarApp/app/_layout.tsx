@@ -35,22 +35,22 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <CartProvider>
-          <StatusBar style="auto" />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="login" />
-            <Stack.Screen name="register" />
-            <Stack.Screen name="forgot-password" />
-            <Stack.Screen name="verify-code" />
-            <Stack.Screen name="farmer-register" />
-            <Stack.Screen name="farmer-register-step2" />
-            <Stack.Screen name="farmer-register-complete" />
-            <Stack.Screen name="personal-info" />
-            <Stack.Screen name="farmer-dashboard" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="product/[id]" />
-            <Stack.Screen name="hidden" />
-          </Stack>
+        <StatusBar style="auto" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="register" />
+          <Stack.Screen name="forgot-password" />
+          <Stack.Screen name="verify-code" />
+          <Stack.Screen name="farmer-register" />
+          <Stack.Screen name="farmer-register-step2" />
+          <Stack.Screen name="farmer-register-complete" />
+          <Stack.Screen name="personal-info" />
+          <Stack.Screen name="farmer-dashboard" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="product/[id]" />
+          <Stack.Screen name="hidden" />
+        </Stack>
         </CartProvider>
       </AuthProvider>
     </SafeAreaProvider>

@@ -11,9 +11,10 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { productAPI, categoryAPI } from '../../src/services/api';
 import { getDevServerIp } from '../../src/utils/networkUtils';
 import { useCart } from '../../src/context/CartContext';
@@ -37,6 +38,7 @@ export default function ProductsScreen() {
   const [sortOption, setSortOption] = useState('default'); // default, price-asc, price-desc, name-asc, name-desc
   const router = useRouter();
   const { addToCart } = useCart();
+  const { categoryId } = useLocalSearchParams();
 
   // Kategori bilgisini alma yardımcı fonksiyonu
   const getCategoryName = (categoryItem: any) => {
@@ -52,101 +54,124 @@ export default function ProductsScreen() {
     return categoryItem.name || categoryItem.category_name || '';
   };
 
-  // Ürünleri ve kategorileri yükle
+  // Ürünleri ve kategorileri yükle - sadece bir kez
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Ürünleri getir
-        const productsResponse = await productAPI.getAllProducts();
-        console.log('Ürünler API yanıtı:', productsResponse);
-        
-        // API yanıt formatını kontrol et
-        if (productsResponse.success && Array.isArray(productsResponse.data)) {
-          setProducts(productsResponse.data);
-        } else if (Array.isArray(productsResponse)) {
-          setProducts(productsResponse);
-        } else if (productsResponse.data && Array.isArray(productsResponse.data)) {
-          setProducts(productsResponse.data);
-        } else {
-          console.warn('Beklenmeyen API yanıt formatı:', productsResponse);
-          setProducts([]);
-        }
-        
-        // Kategorileri getir
-        const categoriesResponse = await categoryAPI.getAllCategories();
-        console.log('Kategoriler API yanıtı:', categoriesResponse);
-        console.log('Ham kategori verileri:', JSON.stringify(categoriesResponse));
-        
-        // Tüm kategoriler seçeneği ekle
-        const allCategoriesOption = { _id: 'all', name: 'Tümü', category_name: 'Tümü' };
-        
-        // Varsayılan kategorilere düşüldüyse bildirim göster
-        if (categoriesResponse.isDefault) {
-          console.warn('DİKKAT: Varsayılan kategoriler kullanılıyor, veritabanına bağlanılamadı.');
-        }
-        
-        if (categoriesResponse.success && Array.isArray(categoriesResponse.data)) {
-          // Kategorileri işle ve name alanlarını düzelt
-          const processedCategories = categoriesResponse.data.map((cat: any) => {
-            // Kategori adını garanti altına al
-            if (!cat.name && cat.category_name) {
-              cat.name = cat.category_name;
-            } else if (!cat.category_name && cat.name) {
-              cat.category_name = cat.name; 
-            }
-            return cat;
-          });
-          
-          setCategories([allCategoriesOption, ...processedCategories]);
-          console.log('İşlenen kategoriler:', allCategoriesOption, ...processedCategories);
-        } else if (Array.isArray(categoriesResponse)) {
-          // Kategorileri işle ve name alanlarını düzelt
-          const processedCategories = categoriesResponse.map((cat: any) => {
-            // Kategori adını garanti altına al
-            if (!cat.name && cat.category_name) {
-              cat.name = cat.category_name;
-            } else if (!cat.category_name && cat.name) {
-              cat.category_name = cat.name; 
-            }
-            return cat;
-          });
-          
-          setCategories([allCategoriesOption, ...processedCategories]);
-          console.log('İşlenen kategoriler (dizi):', allCategoriesOption, ...processedCategories);
-        } else if (categoriesResponse.data && Array.isArray(categoriesResponse.data.data)) {
-          // Kategorileri işle ve name alanlarını düzelt
-          const processedCategories = categoriesResponse.data.data.map((cat: any) => {
-            // Kategori adını garanti altına al
-            if (!cat.name && cat.category_name) {
-              cat.name = cat.category_name;
-            } else if (!cat.category_name && cat.name) {
-              cat.category_name = cat.name; 
-            }
-            return cat;
-          });
-          
-          setCategories([allCategoriesOption, ...processedCategories]);
-          console.log('İşlenen kategoriler (iç içe):', allCategoriesOption, ...processedCategories);
-        } else {
-          console.warn('Beklenmeyen kategori API yanıt formatı:', categoriesResponse);
-          setCategories([allCategoriesOption]);
-        }
-        
-        // Başlangıçta Tümü kategorisini seçili olarak ayarla
-        setSelectedCategory('all');
-        
-        setLoading(false);
-      } catch (err: any) {
-        console.error('Veri yükleme hatası:', err);
-        setError(err.message || 'Ürünler yüklenirken bir hata oluştu');
-        setLoading(false);
-      }
-    };
-    
+    // İlk yükleme için
     fetchData();
   }, []);
+
+  // Her sayfaya dönüşte verileri yeniden yükle
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Ürünler sayfası aktif oldu, veriler yenileniyor...');
+      console.log('URL kategori parametresi:', categoryId);
+      fetchData();
+      return () => {
+        // Fokus kaldırıldığında yapılacak temizlik işlemleri (gerekirse)
+      };
+    }, [categoryId]) // categoryId değiştiğinde tekrar çalıştır
+  );
+
+  // Veri yükleme fonksiyonu
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Ürünleri getir
+      const productsResponse = await productAPI.getAllProducts();
+      console.log('Ürünler API yanıtı:', productsResponse);
+      
+      // API yanıt formatını kontrol et
+      if (productsResponse.success && Array.isArray(productsResponse.data)) {
+        setProducts(productsResponse.data);
+      } else if (Array.isArray(productsResponse)) {
+        setProducts(productsResponse);
+      } else if (productsResponse.data && Array.isArray(productsResponse.data)) {
+        setProducts(productsResponse.data);
+      } else {
+        console.warn('Beklenmeyen API yanıt formatı:', productsResponse);
+        setProducts([]);
+      }
+      
+      // Kategorileri getir
+      const categoriesResponse = await categoryAPI.getAllCategories();
+      console.log('Kategoriler API yanıtı:', categoriesResponse);
+      
+      // Tüm kategoriler seçeneği ekle
+      const allCategoriesOption = { _id: 'all', name: 'Tümü', category_name: 'Tümü' };
+      
+      // Varsayılan kategorilere düşüldüyse bildirim göster
+      if (categoriesResponse.isDefault) {
+        console.warn('DİKKAT: Varsayılan kategoriler kullanılıyor, veritabanına bağlanılamadı.');
+      }
+      
+      let processedCategories = [];
+      
+      if (categoriesResponse.success && Array.isArray(categoriesResponse.data)) {
+        // Kategorileri işle ve name alanlarını düzelt
+        processedCategories = categoriesResponse.data.map((cat: any) => {
+          // Kategori adını garanti altına al
+          if (!cat.name && cat.category_name) {
+            cat.name = cat.category_name;
+          } else if (!cat.category_name && cat.name) {
+            cat.category_name = cat.name; 
+          }
+          return cat;
+        });
+      } else if (Array.isArray(categoriesResponse)) {
+        // Kategorileri işle ve name alanlarını düzelt
+        processedCategories = categoriesResponse.map((cat: any) => {
+          // Kategori adını garanti altına al
+          if (!cat.name && cat.category_name) {
+            cat.name = cat.category_name;
+          } else if (!cat.category_name && cat.name) {
+            cat.category_name = cat.name; 
+          }
+          return cat;
+        });
+      } else if (categoriesResponse.data && Array.isArray(categoriesResponse.data.data)) {
+        // Kategorileri işle ve name alanlarını düzelt
+        processedCategories = categoriesResponse.data.data.map((cat: any) => {
+          // Kategori adını garanti altına al
+          if (!cat.name && cat.category_name) {
+            cat.name = cat.category_name;
+          } else if (!cat.category_name && cat.name) {
+            cat.category_name = cat.name; 
+          }
+          return cat;
+        });
+      }
+      
+      setCategories([allCategoriesOption, ...processedCategories]);
+      
+      // URL'den gelen kategori ID varsa onu seç, yoksa tümünü seç
+      if (categoryId) {
+        console.log('URL parametresinden kategori ID alındı:', categoryId);
+        
+        // Gelen kategori ID'si ile eşleşen kategoriyi bul
+        const matchingCategory = processedCategories.find(
+          (cat: any) => (cat._id || cat.id) === categoryId
+        );
+        
+        if (matchingCategory) {
+          console.log('Eşleşen kategori bulundu:', matchingCategory.name || matchingCategory.category_name);
+          setSelectedCategory(categoryId as string);
+        } else {
+          console.log('Eşleşen kategori bulunamadı, tümü seçildi');
+          setSelectedCategory('all');
+        }
+      } else {
+        // Başlangıçta Tümü kategorisini seçili olarak ayarla
+        setSelectedCategory('all');
+      }
+      
+      setLoading(false);
+    } catch (err: any) {
+      console.error('Veri yükleme hatası:', err);
+      setError(err.message || 'Ürünler yüklenirken bir hata oluştu');
+      setLoading(false);
+    }
+  };
 
   // Favori ekle/çıkar
   const toggleFavorite = (productId: string) => {
@@ -254,6 +279,28 @@ export default function ProductsScreen() {
     const productId = item._id || item.id;
     const isFavorite = favorites.includes(productId);
     
+    // Ürünün stok durumunu kontrol et
+    const stockCount = item.countInStock || 0;
+    const isInStock = stockCount > 0;
+    
+    // Çiftçi bilgisini düzgün formatta hazırla
+    let farmerData = undefined;
+    if (item.farmer) {
+      if (typeof item.farmer === 'string') {
+        // Eğer farmer bir string ise (ID), düzgün bir obje oluştur
+        farmerData = {
+          _id: item.farmer,
+          farmName: 'Çiftlik'
+        };
+      } else if (typeof item.farmer === 'object') {
+        // Farmer bir obje ise, gerekli alanları al
+        farmerData = {
+          _id: item.farmer._id || item.farmer.id || 'unknown',
+          farmName: item.farmer.farmName || item.farmer.farm_name || 'Çiftlik'
+        };
+      }
+    }
+    
     return (
       <TouchableOpacity 
         style={styles.productCard}
@@ -289,6 +336,13 @@ export default function ProductsScreen() {
               color={isFavorite ? '#F44336' : '#666'}
             />
           </TouchableOpacity>
+          
+          {/* Stok durumu belirteci */}
+          {!isInStock && (
+            <View style={styles.outOfStockBadge}>
+              <Text style={styles.outOfStockText}>Tükendi</Text>
+            </View>
+          )}
         </View>
         <View style={styles.productInfo}>
           <Text style={styles.categoryLabel}>{getCategoryName(item.category)}</Text>
@@ -304,9 +358,20 @@ export default function ProductsScreen() {
           </View>
           ) : null}
           <TouchableOpacity 
-            style={styles.addButton}
+            style={[styles.addButton, !isInStock && styles.addButtonDisabled]}
+            disabled={!isInStock}
             onPress={(e) => {
               e.stopPropagation(); // Kart tıklamasını engeller
+              
+              // Stok kontrolü yap
+              if (!isInStock) {
+                Alert.alert(
+                  "Stok Hatası", 
+                  `Üzgünüz, "${item.name}" ürünü stokta bulunmamaktadır.`
+                );
+                return;
+              }
+              
               // Sepete ekleme işlemi
               addToCart({
                 _id: item._id || item.id,
@@ -314,13 +379,13 @@ export default function ProductsScreen() {
                 price: item.price,
                 quantity: 1,
                 unit: item.unit || 'birim',
-                countInStock: item.countInStock || 10,
+                countInStock: stockCount,
                 image: item.image,
-                farmer: item.farmer
+                farmer: farmerData
               });
             }}
           >
-            <Ionicons name="cart-outline" size={18} color="#fff" />
+            <Ionicons name="cart-outline" size={18} color={isInStock ? "#fff" : "#aaa"} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -668,6 +733,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  outOfStockBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(244, 67, 54, 0.8)',
+    paddingVertical: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  outOfStockText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   productInfo: {
     padding: 12,
     position: 'relative',
@@ -717,6 +797,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  addButtonDisabled: {
+    backgroundColor: '#CCCCCC',
   },
   emptyContainer: {
     flex: 1,

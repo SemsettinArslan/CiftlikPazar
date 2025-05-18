@@ -17,6 +17,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { productAPI } from '../../src/services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDevServerIp } from '../../src/utils/networkUtils';
+import { useCart } from '../../src/context/CartContext';
 
 // IP adresini al
 const SERVER_IP = getDevServerIp();
@@ -29,6 +30,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const { addToCart } = useCart();
   
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -95,6 +97,61 @@ export default function ProductDetailScreen() {
     // Burada API'ye favori durumunu kaydedebilirsiniz
   };
 
+  // Sepete ekle fonksiyonu
+  const handleAddToCart = () => {
+    if (product && product.countInStock > 0) {
+      console.log('Ürün farmer verisi:', product.farmer);
+      
+      // Çiftçi bilgisini düzgün formatta hazırla
+      let farmerData = undefined;
+      if (product.farmer) {
+        if (typeof product.farmer === 'string') {
+          // Eğer farmer bir string ise (ID), düzgün bir obje oluştur
+          farmerData = {
+            _id: product.farmer,
+            farmName: 'Çiftlik'
+          };
+        } else if (typeof product.farmer === 'object') {
+          // Farmer bir obje ise, gerekli alanları al
+          farmerData = {
+            _id: product.farmer._id || product.farmer.id || 'unknown',
+            farmName: product.farmer.farmName || product.farmer.farm_name || 'Çiftlik'
+          };
+        }
+      }
+      
+      const result = addToCart({
+        _id: product._id,
+        name: product.name,
+        price: product.price,
+        quantity: quantity,
+        unit: product.unit || 'birim',
+        countInStock: product.countInStock,
+        image: product.image,
+        farmer: farmerData
+      });
+      
+      if (result) {
+        // Sepete ekleme başarılı ise
+        Alert.alert(
+          "Başarılı",
+          `${product.name} sepetinize eklendi.`,
+          [
+            { 
+              text: "Alışverişe Devam Et", 
+              style: "cancel" 
+            },
+            { 
+              text: "Sepete Git", 
+              onPress: () => router.navigate('/(tabs)/cart')
+            }
+          ]
+        );
+      }
+      // Başarısız olma durumu CartContext içinde hallediliyor
+    }
+  };
+
   if (loading) {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -131,14 +188,6 @@ export default function ProductDetailScreen() {
           headerLeft: () => (
             <TouchableOpacity
               style={styles.headerButton}
-              onPress={() => router.back()}
-            >
-              <Ionicons name="arrow-back" size={24} color="#FFF" />
-            </TouchableOpacity>
-          ),
-          headerRight: () => (
-            <TouchableOpacity
-              style={styles.headerButton}
               onPress={toggleFavorite}
             >
               <Ionicons 
@@ -148,6 +197,7 @@ export default function ProductDetailScreen() {
               />
             </TouchableOpacity>
           ),
+          headerRight: () => null,
         }} 
       />
       
@@ -336,13 +386,7 @@ export default function ProductDetailScreen() {
           
           <TouchableOpacity 
             style={styles.addToCartButton}
-            onPress={() => {
-              Alert.alert(
-                "Bilgi", 
-                "Sepete ekleme işlevi şu an mevcut değil.",
-                [{ text: "Tamam", style: "default" }]
-              );
-            }}
+            onPress={handleAddToCart}
           >
             <Ionicons name="cart-outline" size={20} color="#FFF" />
             <Text style={styles.addToCartText}>Sepete Ekle</Text>

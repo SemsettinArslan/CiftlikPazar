@@ -458,6 +458,50 @@ exports.getPendingFarmers = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Onaylanmış çiftçileri getir
+// @route   GET /api/farmers/approved
+// @access  Private (Admin)
+exports.getApprovedFarmers = asyncHandler(async (req, res, next) => {
+  const approvedFarmers = await Farmer.find()
+    .populate({
+      path: 'user',
+      select: 'firstName lastName email phone approvalStatus createdAt',
+      match: { approvalStatus: 'approved', role: 'farmer' }
+    })
+    .populate('categories', 'category_name');
+
+  // Null user filtreleme - eğer populate match koşulları sağlanmazsa user alanı null olabilir
+  const filteredFarmers = approvedFarmers.filter(farmer => farmer.user !== null);
+
+  res.status(200).json({
+    success: true,
+    count: filteredFarmers.length,
+    data: filteredFarmers
+  });
+});
+
+// @desc    Reddedilen çiftçileri getir
+// @route   GET /api/farmers/rejected
+// @access  Private (Admin)
+exports.getRejectedFarmers = asyncHandler(async (req, res, next) => {
+  const rejectedFarmers = await Farmer.find()
+    .populate({
+      path: 'user',
+      select: 'firstName lastName email phone approvalStatus createdAt',
+      match: { approvalStatus: 'rejected', role: 'farmer' }
+    })
+    .populate('categories', 'category_name');
+
+  // Null user filtreleme - eğer populate match koşulları sağlanmazsa user alanı null olabilir
+  const filteredFarmers = rejectedFarmers.filter(farmer => farmer.user !== null);
+
+  res.status(200).json({
+    success: true,
+    count: filteredFarmers.length,
+    data: filteredFarmers
+  });
+});
+
 // @desc    Çiftçi başvurusunu onayla/reddet
 // @route   PUT /api/farmers/:id/approve
 // @access  Private (Admin)

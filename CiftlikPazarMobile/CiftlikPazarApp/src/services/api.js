@@ -89,6 +89,37 @@ export const productAPI = {
   searchProducts: async (query) => {
     return fetchWithToken(`/products/search?q=${query}`, { method: 'GET' });
   },
+
+  // Öne çıkan ürünleri getir
+  getFeaturedProducts: async (limit = 10) => {
+    try {
+      // Öne çıkan ürünleri sorgulamak için API endpoint'i
+      // Sunucu tarafında isFeatured=true filtreleme yapar
+      // Limit parametresi ile kaç ürün döneceğini belirleyebiliriz
+      const response = await fetchWithToken(`/products?isFeatured=true&limit=${limit}`, { 
+        method: 'GET' 
+      });
+      
+      console.log('Öne çıkan ürünler yanıt:', response);
+      
+      // API yanıtını kontrol et ve uygun formata dönüştür
+      if (response && response.success && Array.isArray(response.data)) {
+        return response.data;
+      } else if (response && Array.isArray(response)) {
+        return response;
+      } else if (response && response.data && Array.isArray(response.data)) {
+        return response.data;
+      } else {
+        console.warn('Beklenmeyen öne çıkan ürünler API yanıt formatı:', response);
+        // Hata durumunda boş dizi döndür
+        return [];
+      }
+    } catch (error) {
+      console.error('Öne çıkan ürünler yükleme hatası:', error);
+      // Hata durumunda boş dizi döndür
+      return [];
+    }
+  },
 };
 
 // Sipariş API'leri

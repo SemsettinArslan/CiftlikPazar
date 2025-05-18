@@ -32,7 +32,7 @@ export default function CartScreen() {
   const increaseQuantity = (id: string) => {
     const item = cart.items.find(item => item._id === id);
     if (item) {
-      updateQuantity({ _id: id }, item.quantity + (item.unit === 'kg' ? 0.5 : 1));
+      updateQuantity({ _id: id }, item.quantity + 1);
     }
   };
 
@@ -40,7 +40,7 @@ export default function CartScreen() {
   const decreaseQuantity = (id: string) => {
     const item = cart.items.find(item => item._id === id);
     if (item) {
-      const newQuantity = item.quantity - (item.unit === 'kg' ? 0.5 : 1);
+      const newQuantity = item.quantity - 1;
       if (newQuantity <= 0) {
         // Onay soralım
         Alert.alert(
@@ -122,7 +122,7 @@ export default function CartScreen() {
             </TouchableOpacity>
             
             <Text style={styles.quantity}>
-              {item.unit === 'kg' ? item.quantity.toFixed(1) : item.quantity} {item.unit}
+              {item.quantity} {item.unit}
             </Text>
             
             <TouchableOpacity

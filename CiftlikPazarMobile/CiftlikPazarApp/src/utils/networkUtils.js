@@ -1,7 +1,7 @@
 import { Platform, NativeModules } from 'react-native';
 
 // Manuel IP adresi tanımı - bağlantı sorunu yaşadığınızda buraya bilgisayarınızın IP adresini yazın
-const MANUAL_IP_ADDRESS = '192.168.43.11';
+const MANUAL_IP_ADDRESS = '192.168.3.92';
 
 // Geliştirme sunucusunun IP adresini almanın farklı yolları
 export const getDevServerIp = () => {

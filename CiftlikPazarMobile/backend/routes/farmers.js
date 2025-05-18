@@ -6,6 +6,8 @@ const {
   completeRegistration,
   getAllFarmers,
   getPendingFarmers,
+  getApprovedFarmers,
+  getRejectedFarmers,
   approveFarmer,
   addCertificate,
   getCertificates,
@@ -32,6 +34,14 @@ router.route('/update-profile')
 // Admin rotaları - ÖNEMLİ: Spesifik rotalar /:id gibi genel rotalardan ÖNCE gelmeli
 router.route('/pending')
   .get(protect, authorize('admin'), getPendingFarmers);
+
+// Onaylanmış çiftçileri getir
+router.route('/approved')
+  .get(protect, authorize('admin'), getApprovedFarmers);
+
+// Reddedilen çiftçileri getir
+router.route('/rejected')
+  .get(protect, authorize('admin'), getRejectedFarmers);
   
 router.route('/:id/approve')
   .put(protect, authorize('admin'), approveFarmer);

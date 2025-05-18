@@ -1,40 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useCart } from '../../src/context/CartContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname, Redirect } from 'expo-router';
+import { View, Text, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   const { user, isLoading } = useAuth();
+  const { getCartItemCount } = useCart();
   const router = useRouter();
   const pathname = usePathname();
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Check user data and set admin status
-  useEffect(() => {
-    if (user && user.data) {
-      // Daha katı bir kontrol yapalım
-      const userIsAdmin = user.data.role === 'admin';
-      console.log('TabLayout - User role:', user.data.role);
-      console.log('Is admin?', userIsAdmin);
-      setIsAdmin(userIsAdmin);
-      
-      // Redirect non-admin users away from admin page
-      if (!userIsAdmin && pathname?.includes('/admin')) {
-        console.log('Redirecting non-admin user from admin page');
-        router.replace('/(tabs)');
-      }
-    } else {
-      // Kullanıcı verisi yoksa admin değil
-      setIsAdmin(false);
-      
-      // Kullanıcı verisi yoksa ve admin sayfasındaysa yönlendir
-      if (pathname?.includes('/admin')) {
-        console.log('No user data, redirecting from admin page');
-        router.replace('/(tabs)');
-      }
-    }
-  }, [user, pathname]);
 
   // Show loading screen
   if (isLoading) {
@@ -46,75 +22,17 @@ export default function TabLayout() {
     return <Redirect href="/login" />;
   }
 
-  // Kullanıcı rolüne dayalı olarak tab yapılandırması
-  // Koşullu olarak admin tabını içerme veya içermeme
-  const userRole = user?.data?.role || 'user';
-  const isUserAdmin = userRole === 'admin';
+  // Kullanıcı admin veya çiftçi ise ilgili dashboard'a yönlendir
+  if (user?.data?.role === 'admin') {
+    return <Redirect href="/admin-dashboard" />;
+  }
+  
+  if (user?.data?.role === 'farmer') {
+    return <Redirect href="/farmer-dashboard" />;
+  }
 
-  // Tab ekranlarını tanımla
-  const tabScreens = () => {
-    const commonScreens = [
-      <Tabs.Screen
-        key="index"
-        name="index"
-        options={{
-          title: 'Ana Sayfa',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
-        }}
-      />,
-      <Tabs.Screen
-        key="products"
-        name="products"
-        options={{
-          title: 'Ürünler',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="leaf-outline" size={size} color={color} />
-          ),
-        }}
-      />,
-      <Tabs.Screen
-        key="cart"
-        name="cart"
-        options={{
-          title: 'Sepetim',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cart-outline" size={size} color={color} />
-          ),
-        }}
-      />,
-      <Tabs.Screen
-        key="profile"
-        name="profile"
-        options={{
-          title: 'Profilim',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
-        }}
-      />
-    ];
-
-    // Sadece admin için admin tab ekranını ekle
-    if (isUserAdmin) {
-      // Admin tabını index ve products arasına ekle
-      commonScreens.splice(2, 0, 
-        <Tabs.Screen
-          key="admin"
-          name="admin"
-          options={{
-            title: 'Admin Paneli',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="settings-outline" size={size} color={color} />
-            ),
-          }}
-        />
-      );
-    }
-
-    return commonScreens;
-  };
+  // Sepetteki ürün sayısını al
+  const cartItemCount = getCartItemCount();
 
   return (
     <Tabs
@@ -143,7 +61,72 @@ export default function TabLayout() {
         },
       }}
     >
-      {tabScreens()}
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Ana Sayfa',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="products"
+        options={{
+          title: 'Ürünler',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="leaf-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="cart"
+        options={{
+          title: 'Sepetim',
+          tabBarIcon: ({ color, size }) => (
+            <View style={{ width: size, height: size, alignItems: 'center' }}>
+              <Ionicons name="cart-outline" size={size} color={color} />
+              {cartItemCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {cartItemCount > 99 ? '99+' : cartItemCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profilim',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person-outline" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    right: -6,
+    top: -4,
+    backgroundColor: '#F44336',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+});

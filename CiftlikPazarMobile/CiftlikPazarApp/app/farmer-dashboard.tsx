@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
@@ -27,6 +28,25 @@ export default function FarmerDashboardScreen() {
     return null;
   }
   
+  // Çıkış fonksiyonu - Alert ile onay alarak
+  const handleLogout = () => {
+    Alert.alert(
+      "Çıkış Yap",
+      "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+      [
+        {
+          text: "İptal",
+          style: "cancel"
+        },
+        { 
+          text: "Çıkış Yap", 
+          onPress: () => logout(),
+          style: "destructive"
+        }
+      ]
+    );
+  };
+  
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen 
@@ -37,14 +57,6 @@ export default function FarmerDashboardScreen() {
           headerStyle: {
             backgroundColor: '#4CAF50',
           },
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => logout()}
-              style={{ marginRight: 15 }}
-            >
-              <Ionicons name="log-out-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-          ),
         }}
       />
       
@@ -74,11 +86,11 @@ export default function FarmerDashboardScreen() {
               <Text style={styles.menuTitle}>Çiftlik Bilgileri</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.menuCard}>
+            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/product/add')}>
               <View style={[styles.menuIcon, { backgroundColor: '#4CAF50' }]}>
                 <Ionicons name="leaf-outline" size={24} color="#fff" />
               </View>
-              <Text style={styles.menuTitle}>Ürün Yönetimi</Text>
+              <Text style={styles.menuTitle}>Ürün Ekle</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.menuCard}>
@@ -103,6 +115,19 @@ export default function FarmerDashboardScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Çıkış Butonu - Sayfa sonuna eklendi */}
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Ionicons name="log-out-outline" size={24} color="#fff" />
+          <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
+        </TouchableOpacity>
+        
+        {/* Boşluk ekle */}
+        <View style={{height: 20}} />
+        
       </ScrollView>
     </View>
   );
@@ -184,5 +209,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
+  },
+  // Yeni çıkış butonu stili
+  logoutButton: {
+    backgroundColor: '#F44336',
+    padding: 16,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginTop: 30,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  logoutButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
 }); 
