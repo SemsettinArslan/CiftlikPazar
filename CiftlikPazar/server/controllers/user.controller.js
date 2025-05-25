@@ -310,6 +310,8 @@ exports.updateDeliveryAddress = async (req, res) => {
 // @access  Private
 exports.deleteDeliveryAddress = async (req, res) => {
   try {
+    const addressId = req.params.id;
+    
     // Kullanıcıyı bul
     const user = await User.findById(req.user.id);
     
@@ -320,9 +322,9 @@ exports.deleteDeliveryAddress = async (req, res) => {
       });
     }
     
-    // Silinecek adresi bul
+    // Adresi bul
     const addressIndex = user.deliveryAddresses.findIndex(
-      addr => addr._id.toString() === req.params.id
+      addr => addr._id.toString() === addressId
     );
     
     if (addressIndex === -1) {
@@ -345,6 +347,56 @@ exports.deleteDeliveryAddress = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Sunucu hatası'
+    });
+  }
+};
+
+// @desc    Kullanıcı istatistiklerini getir
+// @route   GET /api/users/stats
+// @access  Private/Admin
+exports.getUserStats = async (req, res) => {
+  try {
+    // Toplam kullanıcı sayısı
+    const totalUsers = await User.countDocuments();
+    
+    // Role göre kullanıcı sayıları
+    const roleCounts = await User.aggregate([
+      {
+        $group: {
+          _id: '$role',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Role göre kullanıcı sayılarını düzenle
+    const usersByRole = {};
+    roleCounts.forEach(item => {
+      usersByRole[item._id] = item.count;
+    });
+    
+    // Son 7 günde kaydolan kullanıcılar
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const newUsers = await User.countDocuments({
+      createdAt: { $gte: oneWeekAgo }
+    });
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        totalUsers,
+        usersByRole,
+        newUsers
+      }
+    });
+  } catch (error) {
+    console.error('Kullanıcı istatistikleri getirme hatası:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Kullanıcı istatistikleri getirilirken bir hata oluştu',
+      error: error.message
     });
   }
 }; 

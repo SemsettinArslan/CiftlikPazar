@@ -14,6 +14,10 @@ const farmerRoutes = require('./routes/farmer.routes');
 const userRoutes = require('./routes/user.routes');
 const productRoutes = require('./routes/product.routes');
 const couponRoutes = require('./routes/coupon.routes');
+const orderRoutes = require('./routes/order.routes');
+const companyRoutes = require('./routes/company.routes');
+const requestRoutes = require('./routes/request.routes');
+const offerRoutes = require('./routes/offer.routes');
 
 // Load environment variables
 dotenv.config();
@@ -64,6 +68,10 @@ app.use('/api/farmers', farmerRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/coupons', couponRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/requests', requestRoutes);
+app.use('/api/offers', offerRoutes);
 
 // Base route
 app.get('/', (req, res) => {

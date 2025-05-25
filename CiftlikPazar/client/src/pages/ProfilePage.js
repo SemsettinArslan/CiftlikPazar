@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Form, Button, Card, Alert, Spinner, Image, Nav, Table, Badge, Modal } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { FaUser, FaMapMarkerAlt, FaEnvelope, FaPhoneAlt, FaCamera, FaEdit, FaTrashAlt, FaPlus, FaSave, FaTimes, FaHome, FaBuilding, FaCheck, FaClipboardList, FaAddressCard, FaIdCard, FaExclamationTriangle } from 'react-icons/fa';
@@ -12,6 +12,7 @@ const BASE_URL = 'http://localhost:3001';
 const ProfilePage = () => {
   const { user, setUser, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   // State tanımlamaları
   const [isLoading, setIsLoading] = useState(false);
@@ -61,6 +62,18 @@ const ProfilePage = () => {
   const [editAddressId, setEditAddressId] = useState(null);
   const [loadingAddresses, setLoadingAddresses] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
+  
+  // URL parametrelerini kontrol et ve ilgili sekmeyi aç
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const section = searchParams.get('section');
+    
+    if (section === 'addresses') {
+      setActiveTab('addresses');
+      // Adres formunu göster
+      setShowAddressForm(true);
+    }
+  }, [location]);
   
   // İlleri yükle
   useEffect(() => {

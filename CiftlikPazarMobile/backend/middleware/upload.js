@@ -1,17 +1,31 @@
 const path = require('path');
 const multer = require('multer');
 const ErrorResponse = require('../utils/errorResponse');
+const fs = require('fs');
 
 // Disk'e dosya kaydetme ayarları
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    // Kök dizindeki uploads klasörünü kullan
+    const uploadPath = path.join(__dirname, '../../../uploads/product-images');
+    
+    // Klasör yoksa oluştur
+    if (!fs.existsSync(uploadPath)) {
+      console.log('Upload klasörü bulunamadı, oluşturuluyor:', uploadPath);
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     // Dosya adını benzersiz yap: timestamp_originalname
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 15);
+    const sanitizedFileName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
+    
     cb(
       null,
-      `${Date.now()}_${path.parse(file.originalname).name}${path.extname(file.originalname)}`
+      `product_${timestamp}_${randomString}_${sanitizedFileName}`
     );
   }
 });

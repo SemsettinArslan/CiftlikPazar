@@ -11,6 +11,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Switch
 } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
@@ -18,51 +19,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { SelectList } from 'react-native-dropdown-select-list';
-import { API_URL } from '../../constants/Config';
+import { getApiBaseUrl } from '../../src/utils/networkUtils';
 
-interface SelectListProps {
-  setSelected: (val: string) => void;
-  data: Array<{key: string, value: string}>;
-  save?: string;
-  placeholder?: string;
-  boxStyles?: object;
-  dropdownStyles?: object;
-  search?: boolean;
-  defaultOption?: {key: string, value: string};
-}
+// API URL'ini al
+const API_URL = getApiBaseUrl();
 
-const SelectList: React.FC<SelectListProps> = ({ 
-  setSelected, 
-  data, 
-  placeholder = "Seçiniz", 
-  boxStyles,
-  defaultOption
-}) => {
-  const [value, setValue] = useState(defaultOption?.key || '');
-  
-  useEffect(() => {
-    if (defaultOption?.key) {
-      setSelected(defaultOption.key);
-    }
-  }, [defaultOption, setSelected]);
-  
-  return (
-    <View style={[{ borderWidth: 1, padding: 10, borderRadius: 5 }, boxStyles]}>
-      <TouchableOpacity 
-        onPress={() => {
-          if (data.length > 0) {
-            setValue(data[0].key);
-            setSelected(data[0].key);
-          }
-        }}
-      >
-        <Text>{value ? data.find(item => item.key === value)?.value : placeholder}</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-interface FormData {
+interface ProductFormData {
   name: string;
   description: string;
   price: string;
@@ -75,13 +37,14 @@ interface FormData {
 interface Category {
   _id: string;
   name: string;
+  category_name?: string;
 }
 
 export default function AddProductScreen() {
   const { user, token } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<ProductFormData>({
     name: '',
     description: '',
     price: '',
@@ -93,6 +56,7 @@ export default function AddProductScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [categories, setCategories] = useState<Array<{key: string, value: string}>>([]);
+  const [aiVerificationResult, setAiVerificationResult] = useState<any>(null);
 
   useEffect(() => {
     if (user && user.data && user.data.role !== 'farmer') {
@@ -103,17 +67,49 @@ export default function AddProductScreen() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get(`${API_URL}/api/categories`);
+        console.log('Fetching categories from:', `${API_URL}/categories?limit=100`);
+        const response = await axios.get(`${API_URL}/categories?limit=100`, {
+          timeout: 10000 // 10 saniye timeout ekle
+        });
+        console.log('Categories API response:', response.data);
+        
         if (response.data.success) {
-          const formattedCategories = response.data.data.map((category: Category) => ({
-            key: category._id,
-            value: category.name,
-          }));
+          const formattedCategories = response.data.data.map((category: Category) => {
+            console.log('Processing category:', category);
+            // Kategori adını düzgün bir şekilde belirle
+            const categoryName = category.name || category.category_name || 'Bilinmeyen kategori';
+            return {
+              key: category._id,
+              value: categoryName,
+            };
+          });
+          console.log('Formatted categories:', formattedCategories);
           setCategories(formattedCategories);
+        } else {
+          console.error('Categories API returned success: false');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Kategoriler yüklenirken hata oluştu:', error);
-        Alert.alert('Hata', 'Kategoriler yüklenirken bir sorun oluştu.');
+        
+        if (error.response) {
+          console.error('Error response:', error.response.status, error.response.data);
+        } else if (error.request) {
+          console.error('No response received:', error.request);
+        } else {
+          console.error('Error message:', error.message);
+        }
+        
+        // Hata durumunda örnek kategoriler ekleyelim
+        const dummyCategories = [
+          { key: '1', value: 'Sebzeler' },
+          { key: '2', value: 'Meyveler' },
+          { key: '3', value: 'Süt Ürünleri' },
+          { key: '4', value: 'Baklagiller' }
+        ];
+        console.log('Using dummy categories as fallback');
+        setCategories(dummyCategories);
+        
+        Alert.alert('Hata', 'Kategoriler yüklenirken bir sorun oluştu. Varsayılan kategoriler gösteriliyor.');
       }
     };
 
@@ -133,6 +129,7 @@ export default function AddProductScreen() {
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: false, // Base64 verisi almıyoruz, dosya olarak yükleyeceğiz
       });
 
       if (!result.canceled) {
@@ -141,37 +138,118 @@ export default function AddProductScreen() {
         const filename = imageUri.split('/').pop() || 'image.jpg';
         
         const match = /\.(\w+)$/.exec(filename);
-        const type = match ? `image/${match[1]}` : 'image';
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
         
-        const formDataObj = new FormData();
+        // FormData oluşturma
+        const formData = new FormData();
         
-        formDataObj.append('image', {
+        // @ts-ignore - React Native'de FormData.append özel bir yapıya sahip
+        formData.append('image', {
           uri: imageUri,
           name: filename,
           type,
         });
 
         try {
+          console.log('Resim yükleme isteği gönderiliyor:', `${API_URL}/products/upload-image`);
+          console.log('FormData içeriği:', {
+            uri: imageUri,
+            name: filename,
+            type
+          });
+          
+          // Token header'ı olmadan doğrudan istek yap
           const response = await axios.post(
-            `${API_URL}/api/products/upload-image`,
-            formDataObj,
+            `${API_URL}/products/upload-image`,
+            formData,
             {
               headers: {
                 'Content-Type': 'multipart/form-data',
-                Authorization: `Bearer ${token}`,
               },
+              timeout: 30000 // 30 saniye timeout
             }
           );
+
+          console.log('Resim yükleme cevabı:', response.data);
 
           if (response.data.success) {
             setImage(response.data.data.imagePath);
             Alert.alert('Başarılı', 'Resim başarıyla yüklendi.');
           } else {
-            Alert.alert('Hata', 'Resim yüklenirken bir sorun oluştu.');
+            Alert.alert('Hata', 'Resim yüklenirken bir sorun oluştu: ' + (response.data.message || 'Bilinmeyen hata'));
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Resim yükleme hatası:', error);
-          Alert.alert('Hata', 'Resim yüklenirken bir sorun oluştu.');
+          
+          // Görüntüyü yeniden boyutlandırma ve sıkıştırma deneyelim
+          try {
+            console.log('Görüntü sıkıştırma deneniyor...');
+            
+            // Görüntüyü daha düşük kalitede yeniden seçelim
+            const compressedResult = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.5, // Daha düşük kalite
+              base64: false,
+            });
+            
+            if (!compressedResult.canceled) {
+              const compressedUri = compressedResult.assets[0].uri;
+              const compressedFilename = compressedUri.split('/').pop() || 'compressed_image.jpg';
+              const compressedType = match ? `image/${match[1]}` : 'image/jpeg';
+              
+              // Yeni FormData oluştur
+              const compressedFormData = new FormData();
+              
+              // @ts-ignore
+              compressedFormData.append('image', {
+                uri: compressedUri,
+                name: compressedFilename,
+                type: compressedType,
+              });
+              
+              console.log('Sıkıştırılmış resim yükleme isteği gönderiliyor');
+              
+              const compressedResponse = await axios.post(
+                `${API_URL}/products/upload-image`,
+                compressedFormData,
+                {
+                  headers: {
+                    'Content-Type': 'multipart/form-data',
+                  },
+                  timeout: 30000
+                }
+              );
+              
+              if (compressedResponse.data.success) {
+                setImage(compressedResponse.data.data.imagePath);
+                Alert.alert('Başarılı', 'Resim sıkıştırılarak başarıyla yüklendi.');
+                return;
+              }
+            }
+          } catch (compressError) {
+            console.error('Görüntü sıkıştırma hatası:', compressError);
+          }
+          
+          // Hata mesajlarını göster
+          if (error.response) {
+            // Sunucu cevabı ile gelen hata
+            console.error('Hata detayları:', {
+              status: error.response.status,
+              data: error.response.data,
+              headers: error.response.headers
+            });
+            Alert.alert('Hata', `Resim yüklenirken bir sorun oluştu: ${error.response.status} - ${error.response.data?.message || 'Bilinmeyen hata'}`);
+          } else if (error.request) {
+            // İstek yapıldı ama cevap alınamadı
+            console.error('İstek yapıldı ama cevap alınamadı:', error.request);
+            Alert.alert('Hata', 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+          } else {
+            // İstek oluşturulurken bir hata oluştu
+            console.error('İstek hatası:', error.message);
+            Alert.alert('Hata', `İstek hatası: ${error.message}`);
+          }
         } finally {
           setImageLoading(false);
         }
@@ -197,6 +275,16 @@ export default function AddProductScreen() {
     try {
       setLoading(true);
 
+      // Token kontrolü
+      if (!token) {
+        Alert.alert('Hata', 'Oturum bilgisi bulunamadı. Lütfen tekrar giriş yapın.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Token:', token);
+      console.log('API URL:', API_URL);
+
       const productData = {
         ...formData,
         price: parseFloat(formData.price),
@@ -204,21 +292,47 @@ export default function AddProductScreen() {
         image: image,
       };
 
+      console.log('Ürün verisi:', productData);
+
       const response = await axios.post(
-        `${API_URL}/api/products`,
+        `${API_URL}/products`,
         productData,
         {
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`
           },
+          timeout: 15000 // 15 saniye timeout
         }
       );
 
+      console.log('Sunucu yanıtı:', response.data);
+
       if (response.data.success) {
+        // AI doğrulama sonucunu kaydet
+        if (response.data.verification) {
+          setAiVerificationResult(response.data.verification);
+        }
+        
+        // Onay durumuna göre mesaj göster
+        let title = 'Başarılı';
+        let message = response.data.message || 'Ürün başarıyla kaydedildi.';
+        
+        if (response.data.data?.approvalStatus === 'approved') {
+          title = 'Başarılı - Otomatik Onaylandı';
+          message = 'Yapay Zeka ürününüzü onayladı! Ürününüz başarıyla kaydedildi ve satışa hazır.';
+        } else if (response.data.verification && response.data.verification.isValid === false) {
+          title = 'İncelemeye Gönderildi';
+          message = 'Yapay Zeka ürününüzü onaylamadı ve incelemeye gönderildi. Neden: ' + 
+            (response.data.verification.reason || 'Belirtilmemiş');
+        } else {
+          title = 'İncelemeye Gönderildi';
+          message = 'Ürününüz başarıyla kaydedildi ve inceleme için gönderildi.';
+        }
+        
         Alert.alert(
-          'Başarılı',
-          response.data.message || 'Ürün başarıyla kaydedildi.',
+          title,
+          message,
           [
             {
               text: 'Tamam',
@@ -231,9 +345,43 @@ export default function AddProductScreen() {
       } else {
         Alert.alert('Hata', 'Ürün kaydedilirken bir sorun oluştu.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ürün kaydetme hatası:', error);
-      Alert.alert('Hata', 'Ürün kaydedilirken bir sorun oluştu.');
+      
+      if (error.response) {
+        // Sunucu cevabı ile gelen hata
+        console.error('Hata detayları:', {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+        
+        if (error.response.status === 401) {
+          Alert.alert(
+            'Oturum Hatası', 
+            'Oturumunuz sona ermiş olabilir. Lütfen tekrar giriş yapın.',
+            [
+              {
+                text: 'Giriş Sayfasına Git',
+                onPress: () => {
+                  // Auth context'ten logout fonksiyonunu çağırabilirsiniz
+                  router.replace('/login');
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Hata', `Ürün kaydedilirken bir sorun oluştu: ${error.response.status} - ${error.response.data?.message || 'Bilinmeyen hata'}`);
+        }
+      } else if (error.request) {
+        // İstek yapıldı ama cevap alınamadı
+        console.error('İstek yapıldı ama cevap alınamadı:', error.request);
+        Alert.alert('Bağlantı Hatası', 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+      } else {
+        // İstek oluşturulurken bir hata oluştu
+        console.error('İstek hatası:', error.message);
+        Alert.alert('Hata', `İstek hatası: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -247,7 +395,7 @@ export default function AddProductScreen() {
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 30}
     >
       <Stack.Screen 
         options={{
@@ -268,7 +416,11 @@ export default function AddProductScreen() {
         }}
       />
       
-      <ScrollView style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={true}
+      >
         <View style={styles.formContainer}>
           <View style={styles.formGroup}>
             <Text style={styles.label}>Ürün Adı *</Text>
@@ -350,18 +502,15 @@ export default function AddProductScreen() {
             </View>
           </View>
 
-          <View style={styles.checkboxContainer}>
-            <TouchableOpacity
-              style={styles.checkbox}
-              onPress={() => setFormData({ ...formData, isOrganic: !formData.isOrganic })}
-            >
-              {formData.isOrganic ? (
-                <Ionicons name="checkbox" size={24} color="#4CAF50" />
-              ) : (
-                <Ionicons name="square-outline" size={24} color="#666" />
-              )}
-            </TouchableOpacity>
-            <Text style={styles.checkboxLabel}>Organik ürün</Text>
+          <View style={styles.switchContainer}>
+            <Text style={styles.label}>Organik Ürün</Text>
+            <Switch
+              trackColor={{ false: "#dddddd", true: "#4CAF50" }}
+              thumbColor={formData.isOrganic ? "#ffffff" : "#f4f3f4"}
+              ios_backgroundColor="#dddddd"
+              onValueChange={(value) => setFormData({ ...formData, isOrganic: value })}
+              value={formData.isOrganic}
+            />
           </View>
 
           <View style={styles.formGroup}>
@@ -376,7 +525,7 @@ export default function AddProductScreen() {
               ) : image ? (
                 <View style={styles.imagePreviewContainer}>
                   <Image
-                    source={{ uri: `${API_URL}/uploads/product-images/${image}` }}
+                    source={{ uri: `${API_URL.replace('/api', '')}/uploads/product-images/${image}` }}
                     style={styles.imagePreview}
                   />
                   <TouchableOpacity 
@@ -390,9 +539,19 @@ export default function AddProductScreen() {
                 <>
                   <Ionicons name="image-outline" size={24} color="#666" />
                   <Text style={styles.uploadText}>Resim Yükle</Text>
+                  <Text style={styles.uploadSubText}>
+                    Ürünü doğru tanımlayan net bir görsel seçin. Yapay zeka ürün görseli ve bilgilerini doğrulayacaktır.
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.aiInfoContainer}>
+            <Ionicons name="information-circle-outline" size={24} color="#4CAF50" />
+            <Text style={styles.aiInfoText}>
+              Ürün bilgileri ve görseli yapay zeka tarafından doğrulanacaktır. Ürün adı ve görselin uyumlu olması önemlidir.
+            </Text>
           </View>
 
           <TouchableOpacity
@@ -422,6 +581,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     margin: 16,
+    marginBottom: 80,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -467,24 +627,23 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 5,
   },
-  checkboxContainer: {
+  switchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
-  },
-  checkbox: {
-    marginRight: 8,
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: '#333',
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
   },
   imageUploadBtn: {
     backgroundColor: '#f9f9f9',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    height: 150,
+    height: 180,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -492,6 +651,13 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     marginTop: 8,
+  },
+  uploadSubText: {
+    color: '#999',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   imagePreviewContainer: {
     width: '100%',
@@ -516,12 +682,27 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
   },
+  aiInfoContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  aiInfoText: {
+    flex: 1,
+    marginLeft: 8,
+    color: '#4a8e3a',
+    fontSize: 14,
+  },
   submitButton: {
     backgroundColor: '#4CAF50',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 16,
   },
   submitButtonText: {
     color: '#fff',

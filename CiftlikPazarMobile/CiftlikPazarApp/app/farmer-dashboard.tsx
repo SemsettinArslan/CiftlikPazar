@@ -93,22 +93,29 @@ export default function FarmerDashboardScreen() {
               <Text style={styles.menuTitle}>Ürün Ekle</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.menuCard}>
+            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/farmer-orders')}>
               <View style={[styles.menuIcon, { backgroundColor: '#FF9800' }]}>
                 <Ionicons name="cart-outline" size={24} color="#fff" />
               </View>
               <Text style={styles.menuTitle}>Siparişler</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.menuCard}>
+            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/farmer-requests')}>
               <View style={[styles.menuIcon, { backgroundColor: '#2196F3' }]}>
-                <Ionicons name="stats-chart-outline" size={24} color="#fff" />
+                <Ionicons name="list-outline" size={24} color="#fff" />
               </View>
-              <Text style={styles.menuTitle}>İstatistikler</Text>
+              <Text style={styles.menuTitle}>Talepler</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/farmer-offers')}>
+              <View style={[styles.menuIcon, { backgroundColor: '#9C27B0' }]}>
+                <Ionicons name="pricetag-outline" size={24} color="#fff" />
+              </View>
+              <Text style={styles.menuTitle}>Tekliflerim</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.menuCard}>
-              <View style={[styles.menuIcon, { backgroundColor: '#9C27B0' }]}>
+              <View style={[styles.menuIcon, { backgroundColor: '#607D8B' }]}>
                 <Ionicons name="settings-outline" size={24} color="#fff" />
               </View>
               <Text style={styles.menuTitle}>Ayarlar</Text>

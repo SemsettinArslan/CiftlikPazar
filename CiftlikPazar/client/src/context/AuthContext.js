@@ -58,6 +58,12 @@ export const AuthProvider = ({ children }) => {
           return true; // Başarılı kayıt ama giriş yok
         }
         
+        // Eğer firma kaydı ise, token'ı kaydetme ve kullanıcıyı ayarlama (onaya kadar)
+        if (userData.role === 'company') {
+          toast.success('Firma kaydınız başarıyla oluşturuldu! Onay sürecinden sonra giriş yapabilirsiniz.');
+          return true; // Başarılı kayıt ama giriş yok
+        }
+        
         // Normal müşteri kaydı için token ve kullanıcı ayarlaması
         localStorage.setItem('token', res.data.token);
         setUser(res.data.user);
@@ -84,6 +90,15 @@ export const AuthProvider = ({ children }) => {
         if (res.data.user.role === 'farmer' && res.data.user.approvalStatus !== 'approved') {
           setError('Çiftçi hesabınız henüz onaylanmamıştır. Onay sürecinden sonra giriş yapabilirsiniz.');
           toast.warning('Çiftçi hesabınız henüz onaylanmamıştır.');
+          localStorage.removeItem('token'); // Token'ı temizle
+          setLoading(false);
+          return false;
+        }
+        
+        // Eğer kullanıcı onaylanmamış bir firma ise giriş engelle
+        if (res.data.user.role === 'company' && res.data.user.approvalStatus !== 'approved') {
+          setError('Firma hesabınız henüz onaylanmamıştır. Onay sürecinden sonra giriş yapabilirsiniz.');
+          toast.warning('Firma hesabınız henüz onaylanmamıştır.');
           localStorage.removeItem('token'); // Token'ı temizle
           setLoading(false);
           return false;

@@ -12,7 +12,7 @@ const advancedResults = (model, populate) => async (req, res, next) => {
   const reqQuery = { ...req.query };
 
   // Özel alanları çıkar
-  const removeFields = ['select', 'sort', 'page', 'limit', 'search'];
+  const removeFields = ['select', 'sort', 'page', 'limit', 'search', 'populate'];
   removeFields.forEach(param => delete reqQuery[param]);
 
   // Arama parametresi varsa
@@ -54,8 +54,15 @@ const advancedResults = (model, populate) => async (req, res, next) => {
 
   query = query.skip(startIndex).limit(limit);
 
-  // Populate
-  if (populate) {
+  // URL'den gelen populate parametresi
+  if (req.query.populate) {
+    const fields = req.query.populate.split(',');
+    fields.forEach(field => {
+      query = query.populate(field);
+    });
+  }
+  // Varsayılan populate
+  else if (populate) {
     if (Array.isArray(populate)) {
       populate.forEach(item => {
         query = query.populate(item);

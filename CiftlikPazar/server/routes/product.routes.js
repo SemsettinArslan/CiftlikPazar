@@ -63,8 +63,11 @@ router.post('/upload-image', protect, authorize('farmer'), upload.single('image'
 // Tüm ürünleri getir (onaylıları)
 router.get('/', productController.getProducts);
 
-// Öne çıkan ürünleri getir
-router.get('/featured', productController.getFeaturedProducts);
+// Öne çıkan ürünleri getir - Ana ürün yoluna yönlendir (isFeatured parametresi ile)
+router.get('/featured', (req, res) => {
+  req.query.isFeatured = 'true';
+  productController.getProducts(req, res);
+});
 
 // Belirli bir çiftçiye ait ürünleri getir
 router.get('/farmer/:farmerId', productController.getProductsByFarmer);
@@ -74,6 +77,9 @@ router.get('/my-products', protect, authorize('farmer'), productController.getMy
 
 // Onay bekleyen ürünleri getir (sadece admin)
 router.get('/pending-approval', protect, authorize('admin'), productController.getPendingProducts);
+
+// Reddedilen ürünleri getir (sadece admin)
+router.get('/rejected', protect, authorize('admin'), productController.getRejectedProducts);
 
 // Admin için durum bazlı ürün listesi getir (onaylı/reddedilmiş/tümü)
 router.get('/admin-products', protect, authorize('admin'), productController.getAdminProductsByStatus);

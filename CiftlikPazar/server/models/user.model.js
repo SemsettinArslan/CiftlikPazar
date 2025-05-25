@@ -106,14 +106,14 @@ const UserSchema = new mongoose.Schema({
   // Rol ve durum
   role: {
     type: String,
-    enum: ['customer', 'farmer', 'admin'],
+    enum: ['customer', 'farmer', 'admin', 'company'],
     default: 'customer'
   },
   approvalStatus: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
     default: function() {
-      return this.role === 'customer' ? 'approved' : 'pending'; // Müşteriler otomatik onaylanır, çiftçiler beklemeye alınır
+      return this.role === 'customer' ? 'approved' : 'pending'; // Müşteriler otomatik onaylanır, diğerleri beklemeye alınır
     }
   },
   accountStatus: {

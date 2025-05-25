@@ -20,6 +20,11 @@ const categories = require('./routes/categories');
 const farmers = require('./routes/farmers');
 const products = require('./routes/products');
 const orders = require('./routes/orders');
+const coupons = require('./routes/couponRoutes');
+const users = require('./routes/users');
+const companies = require('./routes/companies');
+const requests = require('./routes/requests');
+const offers = require('./routes/offers');
 
 const app = express();
 
@@ -48,6 +53,11 @@ app.use('/api/categories', categories);
 app.use('/api/farmers', farmers);
 app.use('/api/products', products);
 app.use('/api/orders', orders);
+app.use('/api/coupons', coupons);
+app.use('/api/users', users);
+app.use('/api/companies', companies);
+app.use('/api/requests', requests);
+app.use('/api/offers', offers);
 
 // Basit route
 app.get('/', (req, res) => {

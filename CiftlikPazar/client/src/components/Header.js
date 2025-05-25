@@ -6,7 +6,7 @@ import { useCart } from '../context/CartContext';
 import { 
   FaShoppingCart, FaUser, FaSignOutAlt, FaSignInAlt, FaUserPlus, 
   FaLeaf, FaStore, FaUsers, FaInfoCircle, FaChevronDown, 
-  FaShieldAlt, FaListAlt, FaUserCheck, FaTachometerAlt
+  FaShieldAlt, FaListAlt, FaUserCheck, FaTachometerAlt, FaFileAlt
 } from 'react-icons/fa';
 
 const BASE_URL = 'http://localhost:3001';
@@ -134,6 +134,18 @@ const Header = () => {
                 <FaUsers className="me-2" /> Üreticiler
               </Nav.Link>
               
+              {/* Talepler link - Only visible to farmers and companies */}
+              {user && (user.role === 'farmer' || user.role === 'company') && user.approvalStatus === 'approved' && (
+                <Nav.Link 
+                  as={Link} 
+                  to="/requests" 
+                  style={navLinkStyle}
+                  className="d-flex align-items-center"
+                >
+                  <FaFileAlt className="me-2" /> Talepler
+                </Nav.Link>
+              )}
+              
               <Nav.Link 
                 as={Link} 
                 to="/about" 
@@ -241,6 +253,57 @@ const Header = () => {
                           >
                             <FaTachometerAlt className="me-2" /> 
                             <span>Çiftlik Paneli</span>
+                          </Link>
+                          <Link 
+                            to="/requests" 
+                            className="dropdown-item py-2 px-3"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              transition: 'background-color 0.15s ease-in-out',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(74, 142, 58, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                          >
+                            <FaFileAlt className="me-2" /> 
+                            <span>Talepler</span>
+                          </Link>
+                          <hr className="dropdown-divider my-1" />
+                        </>
+                      )}
+                      
+                      {user.role === 'company' && (user.approvalStatus === 'approved') && (
+                        <>
+                          <Link 
+                            to="/company/dashboard" 
+                            className="dropdown-item py-2 px-3"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              transition: 'background-color 0.15s ease-in-out',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(74, 142, 58, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                          >
+                            <FaTachometerAlt className="me-2" /> 
+                            <span>Firma Paneli</span>
+                          </Link>
+                          <Link 
+                            to="/requests" 
+                            className="dropdown-item py-2 px-3"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              transition: 'background-color 0.15s ease-in-out',
+                              cursor: 'pointer'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(74, 142, 58, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                          >
+                            <FaFileAlt className="me-2" /> 
+                            <span>Talepler</span>
                           </Link>
                           <hr className="dropdown-divider my-1" />
                         </>

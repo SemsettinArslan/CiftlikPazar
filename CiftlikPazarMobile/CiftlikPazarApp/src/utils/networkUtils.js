@@ -1,7 +1,7 @@
 import { Platform, NativeModules } from 'react-native';
 
 // Manuel IP adresi tanımı - bağlantı sorunu yaşadığınızda buraya bilgisayarınızın IP adresini yazın
-const MANUAL_IP_ADDRESS = '192.168.3.92';
+const MANUAL_IP_ADDRESS = '192.168.208.92';
 
 // Geliştirme sunucusunun IP adresini almanın farklı yolları
 export const getDevServerIp = () => {
@@ -11,7 +11,7 @@ export const getDevServerIp = () => {
     console.log('Dev Mode:', __DEV__ ? 'Yes' : 'No');
     console.log('Source Script URL:', NativeModules.SourceCode?.scriptURL || 'Not available');
     
-    // NOT: Expo Go NOBRIDGE modunda çalışırken otomatik IP tespiti çalışmaz
+    // Expo Go NOBRIDGE modunda çalışırken otomatik IP tespiti çalışmaz
     // Bu durumda manuel tanımlanan IP adresini kullan
     console.log('Using manually defined IP address:', MANUAL_IP_ADDRESS);
     return MANUAL_IP_ADDRESS;
@@ -58,6 +58,6 @@ export const getApiBaseUrl = () => {
   const serverIp = getDevServerIp();
   const port = '5000';
   const url = `http://${serverIp}:${port}/api`;
-  console.log('API URL generated:', url);
+  console.log('API URL generated for mobile app:', url);
   return url;
 }; 

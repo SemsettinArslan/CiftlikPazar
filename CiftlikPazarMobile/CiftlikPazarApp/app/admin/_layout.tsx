@@ -50,33 +50,12 @@ export default function AdminLayout() {
   }
 
   return (
-    <Stack>
-      <Stack.Screen 
-        name="index" 
-        options={{ 
-          headerTitle: "Admin Paneli",
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerTitleStyle: {
-            color: '#333',
-            fontWeight: 'bold',
-          }
-        }} 
-      />
-      <Stack.Screen 
-        name="farmer-requests" 
-        options={{ 
-          headerTitle: "Admin Paneli",
-          headerStyle: {
-            backgroundColor: '#fff',
-          },
-          headerTitleStyle: {
-            color: '#333',
-            fontWeight: 'bold',
-          }
-        }} 
-      />
+    <Stack screenOptions={{ 
+      headerShown: false // Header'ı tamamen gizliyoruz, her sayfada kendi header'ını kullanacak
+    }}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="farmer-requests" options={{ headerShown: false }} />
+      <Stack.Screen name="company-requests" options={{ headerShown: false }} />
     </Stack>
   );
 } 

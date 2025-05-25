@@ -105,7 +105,7 @@ const UserSchema = new mongoose.Schema({
   // Rol ve durum - Web uygulamasıyla uyumlu
   role: {
     type: String,
-    enum: ['customer', 'farmer', 'admin'],
+    enum: ['customer', 'farmer', 'admin', 'company'],
     default: 'customer'
   },
   approvalStatus: {

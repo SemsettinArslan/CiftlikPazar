@@ -116,6 +116,13 @@ const LoginScreen = () => {
             <Text style={styles.farmerLink}>Çiftçi Olarak Kayıt Ol</Text>
           </TouchableOpacity>
         </View>
+        
+        <View style={styles.companyContainer}>
+          <Text style={styles.companyText}>Firma sahibi misiniz?</Text>
+          <TouchableOpacity onPress={() => router.push('/company-register')}>
+            <Text style={styles.companyLink}>Firma Olarak Kayıt Ol</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -209,6 +216,23 @@ const styles = StyleSheet.create({
   },
   farmerLink: {
     color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  companyContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    marginBottom: 20,
+  },
+  companyText: {
+    color: '#333',
+    marginRight: 5,
+  },
+  companyLink: {
+    color: '#1976D2',
     fontWeight: 'bold',
   },
 });

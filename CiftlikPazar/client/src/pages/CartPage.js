@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Button, Table, Image, Form, Alert, InputGroup, Spinner, Badge } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaTrash, FaMinus, FaPlus, FaShoppingCart, FaLeaf, FaTicketAlt, FaTimes, FaExclamationTriangle, FaInfoCircle } from 'react-icons/fa';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 const CartPage = () => {
-  const { cart, updateQuantity, removeFromCart, clearCart, applyCoupon, removeCoupon, couponLoading, couponError } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart, applyCoupon, removeCoupon, couponLoading, couponError, getShippingFee, getOrderTotal } = useCart();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [couponCode, setCouponCode] = useState('');
   const [couponValidationError, setCouponValidationError] = useState('');
 
@@ -58,6 +62,72 @@ const CartPage = () => {
   
   // Son toplam fiyat (minimum alışveriş koşulunu kontrol ederek)
   const finalTotal = cart.totalPrice - actualDiscountAmount;
+
+  // Ödeme işlemine geçiş kontrolü
+  const handleCheckout = () => {
+    // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+    if (!user) {
+      toast.info(
+        <div className="d-flex align-items-center">
+          <FaInfoCircle className="me-2" size={18} />
+          <div>
+            <div className="fw-bold">Giriş Yapmalısınız</div>
+            <div>Ödeme yapmak için lütfen giriş yapın</div>
+          </div>
+        </div>, 
+        {
+          position: "bottom-right",
+          autoClose: 3000
+        }
+      );
+      navigate('/login');
+      return;
+    }
+
+    // Kullanıcı rolü kontrolü
+    if (user.role === 'farmer') {
+      toast.warning(
+        <div className="d-flex align-items-center">
+          <FaExclamationTriangle className="me-2" size={18} />
+          <div>
+            <div className="fw-bold">Çiftçi Hesabı İle Alışveriş Yapılamaz</div>
+            <div>Çiftçi hesabınız ile ürün satın alamazsınız. Lütfen müşteri hesabı ile giriş yapın.</div>
+          </div>
+        </div>, 
+        {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true
+        }
+      );
+      return;
+    } else if (user.role === 'admin') {
+      toast.warning(
+        <div className="d-flex align-items-center">
+          <FaExclamationTriangle className="me-2" size={18} />
+          <div>
+            <div className="fw-bold">Admin Hesabı İle Alışveriş Yapılamaz</div>
+            <div>Admin hesabınız ile ürün satın alamazsınız. Lütfen müşteri hesabı ile giriş yapın.</div>
+          </div>
+        </div>, 
+        {
+          position: "bottom-right",
+          autoClose: 5000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true
+        }
+      );
+      return;
+    }
+
+    // Müşteri rolüne sahip kullanıcılar için ödeme sayfasına yönlendir
+    navigate('/checkout');
+  };
 
   return (
     <Container className="py-5">
@@ -396,8 +466,9 @@ const CartPage = () => {
                   variant="success" 
                   className="w-100"
                   disabled={cart.coupon && !isMinimumPurchaseMet}
+                  onClick={handleCheckout}
                 >
-                  Ödemeye Geç
+                  Ödemeyi Tamamla
                 </Button>
                 
                 <Alert variant="info" className="mt-4 mb-0">

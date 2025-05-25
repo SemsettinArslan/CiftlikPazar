@@ -6,11 +6,44 @@ const { verifyProduct } = require('../utils/geminiAI');
 // Tüm ürünleri getir (sadece onaylı ürünler)
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find({ approvalStatus: 'approved' })
+    // Filtreleme - varsayılan olarak onaylı ürünler
+    const query = { approvalStatus: 'approved' };
+    
+    // Eğer istek sadece öne çıkanları istiyorsa
+    if (req.query.isFeatured === 'true') {
+      query.isFeatured = true;
+    }
+    
+    // Eğer özel olarak bir onay durumu belirtilmişse
+    if (req.query.approvalStatus) {
+      // Admin veya çiftçi ise tüm onay durumlarını görebilir
+      if (req.user && (req.user.role === 'admin' || req.user.role === 'farmer')) {
+        if (['approved', 'pending', 'rejected'].includes(req.query.approvalStatus)) {
+          query.approvalStatus = req.query.approvalStatus;
+        }
+      } else {
+        // Normal kullanıcılar sadece onaylı ürünleri görebilir
+        // approvalStatus parametresi ne olursa olsun, sadece onaylı ürünleri göster
+        query.approvalStatus = 'approved';
+      }
+    }
+
+    // Limit parametresi kontrol et
+    const limit = req.query.limit ? parseInt(req.query.limit) : undefined;
+    
+    // Ürünleri getir
+    let productsQuery = Product.find(query)
       .populate({
         path: 'farmer',
         select: 'farmName city district description'
       });
+    
+    // Eğer limit belirtilmişse uygula
+    if (limit && limit > 0) {
+      productsQuery = productsQuery.limit(limit);
+    }
+    
+    const products = await productsQuery;
     
     res.json({
       success: true,
@@ -427,7 +460,7 @@ exports.getPendingProducts = async (req, res) => {
         select: 'farmName city district user',
         populate: { path: 'user', select: 'firstName lastName email' }
       })
-      .populate('category', 'category_name')
+      .populate('category', 'name')
       .sort({ createdAt: -1 }); // En yeni eklenenler üstte
     
     res.status(200).json({
@@ -444,10 +477,39 @@ exports.getPendingProducts = async (req, res) => {
   }
 };
 
+// Reddedilen ürünleri getir (admin için)
+exports.getRejectedProducts = async (req, res) => {
+  try {
+    const rejectedProducts = await Product.find({ approvalStatus: 'rejected' })
+      .populate({
+        path: 'farmer',
+        select: 'farmName city district user',
+        populate: { path: 'user', select: 'firstName lastName email' }
+      })
+      .populate('category', 'name')
+      .sort({ approvalDate: -1, createdAt: -1 }); // En son işlem yapılanlar üstte
+    
+    res.status(200).json({
+      success: true,
+      count: rejectedProducts.length,
+      data: rejectedProducts
+    });
+  } catch (error) {
+    console.error('Reddedilen ürünleri getirme hatası:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Sunucu hatası' 
+    });
+  }
+};
+
 // Ürün onaylama (admin için)
 exports.approveProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    // Ürünü ID'ye göre bul ve çiftçi/kategori ile birlikte getir
+    const product = await Product.findById(req.params.id)
+      .populate('farmer', 'farmName')
+      .populate('category', 'name');
     
     if (!product) {
       return res.status(404).json({
@@ -463,10 +525,12 @@ exports.approveProduct = async (req, res) => {
       });
     }
     
+    // Ürün durumunu güncelle
     product.approvalStatus = 'approved';
     product.approvalDate = Date.now();
     product.rejectionReason = null;
     
+    // Değişiklikleri kaydet
     await product.save();
     
     res.status(200).json({
@@ -495,7 +559,10 @@ exports.rejectProduct = async (req, res) => {
       });
     }
     
-    const product = await Product.findById(req.params.id);
+    // Ürünü ID'ye göre bul ve çiftçi/kategori ile birlikte getir
+    const product = await Product.findById(req.params.id)
+      .populate('farmer', 'farmName')
+      .populate('category', 'name');
     
     if (!product) {
       return res.status(404).json({
@@ -504,10 +571,12 @@ exports.rejectProduct = async (req, res) => {
       });
     }
     
+    // Ürün durumunu güncelle
     product.approvalStatus = 'rejected';
     product.rejectionReason = reason;
     product.approvalDate = Date.now();
     
+    // Değişiklikleri kaydet
     await product.save();
     
     res.status(200).json({
@@ -537,13 +606,14 @@ exports.getAdminProductsByStatus = async (req, res) => {
       query.approvalStatus = status;
     }
     
+    // Ürünleri çiftçi ve kategori bilgileriyle birlikte getir
     const products = await Product.find(query)
       .populate({
         path: 'farmer',
         select: 'farmName city district user',
         populate: { path: 'user', select: 'firstName lastName email' }
       })
-      .populate('category', 'category_name')
+      .populate('category', 'name')
       .sort({ approvalDate: -1, createdAt: -1 }); // En son işlem yapılanlar üstte
     
     res.status(200).json({

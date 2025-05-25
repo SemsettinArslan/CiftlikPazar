@@ -30,6 +30,10 @@ export default function TabLayout() {
   if (user?.data?.role === 'farmer') {
     return <Redirect href="/farmer-dashboard" />;
   }
+  
+  if (user?.data?.role === 'company') {
+    return <Redirect href="/company-dashboard" />;
+  }
 
   // Sepetteki ürün sayısını al
   const cartItemCount = getCartItemCount();

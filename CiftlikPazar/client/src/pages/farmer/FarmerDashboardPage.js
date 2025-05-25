@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Row, Col, Card, Nav, Tab, Alert, Badge, Form, Button, Spinner } from 'react-bootstrap';
-import { FaLeaf, FaBoxOpen, FaShoppingCart, FaChartBar, FaCog, FaTachometerAlt, FaExclamationCircle, FaSave, FaCheck } from 'react-icons/fa';
+import { Container, Row, Col, Card, Nav, Tab, Alert, Badge, Form, Button, Spinner, Table } from 'react-bootstrap';
+import { FaLeaf, FaBoxOpen, FaShoppingCart, FaChartBar, FaCog, FaTachometerAlt, FaExclamationCircle, FaSave, FaCheck, FaHandshake, FaEye } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ProductManagement from './ProductManagement';
+import OrderManagement from '../../components/farmer/OrderManagement';
 
 // Backend API URL'i
 const API_BASE_URL = 'http://localhost:3001';
@@ -69,6 +70,11 @@ const FarmerDashboardPage = () => {
   const [cityLoading, setCityLoading] = useState(false);
   const [districtLoading, setDistrictLoading] = useState(false);
   const [validated, setValidated] = useState(false);
+  
+  // Teklifler için state'ler ekleyelim
+  const [offers, setOffers] = useState([]);
+  const [offersLoading, setOffersLoading] = useState(false);
+  const [offerError, setOfferError] = useState(null);
 
   // Kategorileri getiren fonksiyon
   const fetchCategories = async () => {
@@ -393,6 +399,87 @@ const FarmerDashboardPage = () => {
     }
   };
 
+  // Çiftçinin tekliflerini getiren fonksiyon
+  const fetchFarmerOffers = async () => {
+    setOffersLoading(true);
+    setOfferError(null);
+    try {
+      const token = localStorage.getItem('token');
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      };
+      
+      console.log('Çiftçi teklifleri getiriliyor...');
+      
+      // Doğru endpoint: /api/offers/my-offers
+      const response = await axios.get('/api/offers/my-offers', config);
+      console.log('Teklifler yanıtı:', response.data);
+      
+      if (response.data && response.data.success) {
+        const responseData = response.data.data;
+        console.log('Çiftçi teklifleri:', responseData);
+        
+        // Veri formatını düzelt
+        const formattedOffers = responseData.map(offer => {
+          return {
+            offerId: offer._id,
+            requestId: offer.request._id,
+            requestTitle: offer.request.title,
+            company: offer.request.company,
+            quantity: offer.quantity,
+            unit: offer.request.unit,
+            price: offer.price,
+            status: offer.status,
+            createdAt: offer.createdAt,
+            updatedAt: offer.updatedAt || offer.createdAt
+          };
+        });
+        
+        console.log('Düzenlenmiş teklifler:', formattedOffers);
+        setOffers(formattedOffers);
+      } else {
+        console.log('Teklifler alınamadı:', response.data);
+        setOffers([]);
+        setOfferError('Teklifler alınamadı');
+      }
+    } catch (err) {
+      console.error('Teklifler getirilirken hata:', err);
+      setOfferError('Teklifler getirilirken bir hata oluştu: ' + (err.response?.data?.message || err.message));
+      setOffers([]);
+    } finally {
+      setOffersLoading(false);
+    }
+  };
+  
+  // Teklifleri getirmek için useEffect
+  useEffect(() => {
+    if (activeTab === 'my-offers') {
+      fetchFarmerOffers();
+    }
+  }, [activeTab]);
+  
+  // Tarih formatını düzenleyen fonksiyon
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return new Date(dateString).toLocaleDateString('tr-TR', options);
+  };
+  
+  // Durum badge'i döndüren fonksiyon
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'pending':
+        return <Badge bg="warning">Beklemede</Badge>;
+      case 'accepted':
+        return <Badge bg="success">Kabul Edildi</Badge>;
+      case 'rejected':
+        return <Badge bg="danger">Reddedildi</Badge>;
+      default:
+        return <Badge bg="secondary">Bilinmiyor</Badge>;
+    }
+  };
+
   // Yükleniyor ekranı
   if (loading) {
     return (
@@ -466,6 +553,20 @@ const FarmerDashboardPage = () => {
                     }}
                   >
                     <FaCog className="me-2" /> Çiftlik Bilgileri
+                  </Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link 
+                    eventKey="my-offers" 
+                    className="border-bottom rounded-0 px-4 py-3"
+                    style={{ 
+                      color: activeTab === 'my-offers' ? '#4a8e3a' : '#495057',
+                      backgroundColor: activeTab === 'my-offers' ? 'rgba(74, 142, 58, 0.1)' : 'transparent',
+                      fontWeight: '500',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <FaHandshake className="me-2" /> Tekliflerim
                   </Nav.Link>
                 </Nav.Item>
                 <Nav.Item>
@@ -777,16 +878,83 @@ const FarmerDashboardPage = () => {
                   </Form>
                 </Tab.Pane>
 
+                <Tab.Pane eventKey="my-offers" active={activeTab === 'my-offers'}>
+                  <h4 className="border-bottom pb-3 mb-4 text-success">Verdiğim Teklifler</h4>
+                  
+                  {offerError && (
+                    <Alert variant="danger" className="d-flex align-items-center">
+                      <FaExclamationCircle className="me-2" />
+                      {offerError}
+                    </Alert>
+                  )}
+                  
+                  {offersLoading ? (
+                    <div className="text-center py-5">
+                      <Spinner animation="border" variant="success" />
+                      <p className="mt-3">Teklifleriniz yükleniyor...</p>
+                    </div>
+                  ) : offers.length === 0 ? (
+                    <Alert variant="info" className="d-flex align-items-center">
+                      <FaExclamationCircle className="me-2" />
+                      Henüz teklif vermemişsiniz.
+                    </Alert>
+                  ) : (
+                    <div className="table-responsive">
+                      <Table hover className="align-middle">
+                        <thead className="bg-light">
+                          <tr>
+                            <th>Talep</th>
+                            <th>Firma</th>
+                            <th>Miktar</th>
+                            <th>Teklif Fiyatı</th>
+                            <th>Durum</th>
+                            <th>Tarih</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {offers.map((offer) => (
+                            <tr key={offer.offerId}>
+                              <td>
+                                <div className="d-flex align-items-center">
+                                  <div>
+                                    <div className="fw-medium">{offer.requestTitle}</div>
+                                    <small className="text-muted">#{offer.requestId.substring(offer.requestId.length - 6)}</small>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div className="fw-medium">
+                                  {offer.company && offer.company.companyName 
+                                    ? offer.company.companyName 
+                                    : 'İsimsiz Firma'}
+                                </div>
+                                <small className="text-muted">
+                                  {offer.company && offer.company.city 
+                                    ? `${offer.company.city}${offer.company.district ? `, ${offer.company.district}` : ''}` 
+                                    : 'Konum belirtilmemiş'}
+                                </small>
+                              </td>
+                              <td>{offer.quantity} {offer.unit}</td>
+                              <td className="fw-medium text-success">
+                                {parseFloat(offer.price).toFixed(2)} ₺
+                              </td>
+                              <td>{getStatusBadge(offer.status)}</td>
+                              <td>{formatDate(offer.createdAt)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </div>
+                  )}
+                </Tab.Pane>
+
                 <Tab.Pane eventKey="products" active={activeTab === 'products'}>
                   <ProductManagement apiClient={apiClient} farmerId={farmerData?._id} />
                 </Tab.Pane>
 
                 <Tab.Pane eventKey="orders" active={activeTab === 'orders'}>
                   <h4 className="border-bottom pb-3 mb-4 text-success">Siparişler</h4>
-                  <Alert variant="info" className="d-flex align-items-center">
-                    <FaExclamationCircle className="me-2 text-info" />
-                    Sipariş modülü henüz eklenmedi. Yakında burada siparişlerinizi takip edebileceksiniz.
-                  </Alert>
+                  <OrderManagement apiClient={apiClient} farmerId={farmerData?._id} />
                 </Tab.Pane>
 
                 <Tab.Pane eventKey="statistics" active={activeTab === 'statistics'}>

@@ -7,6 +7,18 @@ import axios from 'axios';
 // Context oluştur
 const CartContext = createContext();
 
+// Başlangıç durumu
+const initialState = {
+  items: [],
+  totalItems: 0,
+  totalPrice: 0,
+  currentFarmerId: null,
+  coupon: null,
+  discountAmount: 0,
+  orderSuccess: false,
+  orderId: null
+};
+
 // Reducer fonksiyonu
 const cartReducer = (state, action) => {
   switch (action.type) {
@@ -133,7 +145,9 @@ const cartReducer = (state, action) => {
         totalPrice: 0,
         currentFarmerId: null,
         coupon: null,
-        discountAmount: 0
+        discountAmount: 0,
+        orderSuccess: false,
+        orderId: null
       };
       
     case 'REPLACE_CART':
@@ -154,6 +168,13 @@ const cartReducer = (state, action) => {
         coupon: null,
         discountAmount: 0
       };
+      
+    case 'ORDER_SUCCESS':
+      return {
+        ...initialState,
+        orderSuccess: true,
+        orderId: action.payload
+      };
 
     default:
       return state;
@@ -168,7 +189,9 @@ export const CartProvider = ({ children }) => {
     totalPrice: 0,
     currentFarmerId: null,
     coupon: null,
-    discountAmount: 0
+    discountAmount: 0,
+    orderSuccess: false,
+    orderId: null
   };
 
   // LocalStorage'dan sepet verisini yükle
@@ -320,7 +343,104 @@ export const CartProvider = ({ children }) => {
   };
 
   const getCartTotal = () => {
-    return state.totalPrice - state.discountAmount;
+    return state.totalPrice;
+  };
+  
+  // Kargo ücreti hesaplama
+  const getShippingFee = () => {
+    // 150 TL üzeri alışverişlerde kargo ücretsiz
+    const FREE_SHIPPING_THRESHOLD = 150;
+    const SHIPPING_FEE = 20;
+    
+    return state.totalPrice >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+  };
+  
+  // Sipariş toplam tutarı (indirim ve kargo dahil)
+  const getOrderTotal = () => {
+    const cartTotal = state.totalPrice;
+    const discountAmount = state.discountAmount;
+    const shippingFee = getShippingFee();
+    
+    return cartTotal - discountAmount + shippingFee;
+  };
+  
+  // Sipariş oluşturma
+  const createOrder = async (shippingAddress, paymentMethod = 'Kapıda Ödeme') => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Teslimat adresi kontrolü
+      if (!shippingAddress) {
+        setError('Teslimat adresi bilgileri eksik');
+        return { success: false };
+      }
+
+      // Zorunlu alanların kontrolü
+      const requiredFields = ['fullName', 'address', 'city', 'district', 'phone'];
+      const missingFields = requiredFields.filter(field => !shippingAddress[field]);
+      
+      if (missingFields.length > 0) {
+        setError(`Teslimat adresi için gerekli alanlar eksik: ${missingFields.join(', ')}`);
+        return { success: false };
+      }
+      
+      // Sipariş verisi oluştur
+      const orderData = {
+        items: state.items.map(item => ({
+          product: item._id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          image: item.image,
+          farmer: item.farmer?._id || item.farmer
+        })),
+        shippingAddress,
+        paymentMethod,
+        totalPrice: state.totalPrice,
+        shippingFee: getShippingFee(),
+        totalAmount: getOrderTotal(),
+        coupon: state.coupon ? state.coupon._id : null,
+        discountAmount: state.discountAmount
+      };
+      
+      // API isteği gönder
+      const token = localStorage.getItem('token');
+      const response = await axios.post('http://localhost:3001/api/orders', orderData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      
+      if (response.data.success) {
+        // Başarılı sipariş
+        dispatch({ 
+          type: 'ORDER_SUCCESS',
+          payload: response.data.data._id
+        });
+        
+        toast.success(
+          <div className="d-flex align-items-center">
+            <FaShoppingCart className="me-2" />
+            <span>Siparişiniz başarıyla oluşturuldu!</span>
+          </div>
+        );
+        
+        return {
+          success: true,
+          orderId: response.data.data._id
+        };
+      } else {
+        setError('Sipariş oluşturulurken bir hata oluştu.');
+        return { success: false };
+      }
+    } catch (err) {
+      console.error('Sipariş oluşturma hatası:', err);
+      setError(err.response?.data?.message || 'Sipariş oluşturulurken bir hata oluştu.');
+      return { success: false };
+    } finally {
+      setLoading(false);
+    }
   };
   
   // Kupon işlemleri
@@ -459,6 +579,9 @@ export const CartProvider = ({ children }) => {
     clearCart,
     getCartItemCount,
     getCartTotal,
+    getShippingFee,
+    getOrderTotal,
+    createOrder,
     applyCoupon,
     removeCoupon,
     couponLoading: loading,

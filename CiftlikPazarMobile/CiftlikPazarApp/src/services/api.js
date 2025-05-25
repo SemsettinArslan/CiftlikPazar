@@ -70,9 +70,9 @@ export const userAPI = {
 
 // Ürün API'leri
 export const productAPI = {
-  // Tüm ürünleri getir
+  // Tüm ürünleri getir (sadece onaylı ürünler)
   getAllProducts: async () => {
-    return fetchWithToken('/products', { method: 'GET' });
+    return fetchWithToken('/products?approvalStatus=approved', { method: 'GET' });
   },
 
   // Ürün detaylarını getir
@@ -96,7 +96,7 @@ export const productAPI = {
       // Öne çıkan ürünleri sorgulamak için API endpoint'i
       // Sunucu tarafında isFeatured=true filtreleme yapar
       // Limit parametresi ile kaç ürün döneceğini belirleyebiliriz
-      const response = await fetchWithToken(`/products?isFeatured=true&limit=${limit}`, { 
+      const response = await fetchWithToken(`/products?isFeatured=true&approvalStatus=approved&limit=${limit}`, { 
         method: 'GET' 
       });
       
@@ -148,9 +148,9 @@ export const categoryAPI = {
   // Tüm kategorileri getir
   getAllCategories: async () => {
     try {
-      console.log('Kategoriler getiriliyor:', `${API_URL}/categories?limit=100`);
+      console.log('Kategoriler getiriliyor:', `${API_URL}/categories?limit=1000`);
       
-      const response = await fetch(`${API_URL}/categories?limit=100`, {
+      const response = await fetch(`${API_URL}/categories?limit=1000`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',

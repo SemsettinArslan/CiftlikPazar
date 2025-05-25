@@ -112,16 +112,9 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Siparişlerim</Text>
         
         <ProfileMenuItem 
-          icon="bag-check-outline" 
-          title="Aktif Siparişler" 
-          onPress={() => {}} 
-          showBadge 
-        />
-        
-        <ProfileMenuItem 
-          icon="time-outline" 
-          title="Sipariş Geçmişi" 
-          onPress={() => {}} 
+          icon="receipt-outline" 
+          title="Siparişlerim" 
+          onPress={() => router.push('/orders')} 
         />
       </View>
 

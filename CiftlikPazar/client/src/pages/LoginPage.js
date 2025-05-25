@@ -1,6 +1,6 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { Container, Form, Button, Card, Alert, Spinner } from 'react-bootstrap';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { FaSignInAlt } from 'react-icons/fa';
 
@@ -9,8 +9,19 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [validated, setValidated] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const { login, loading } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check for messages in location state (from redirects)
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Clean up the location state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,6 +36,7 @@ const LoginPage = () => {
 
     setValidated(true);
     setError('');
+    setSuccessMessage('');
 
     // Giriş işlemi
     const success = await login(email, password);
@@ -46,6 +58,7 @@ const LoginPage = () => {
             </div>
 
             {error && <Alert variant="danger">{error}</Alert>}
+            {successMessage && <Alert variant="success">{successMessage}</Alert>}
 
             <Form noValidate validated={validated} onSubmit={handleSubmit}>
               <Form.Group className="mb-3" controlId="email">

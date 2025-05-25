@@ -237,6 +237,11 @@ const FarmerRegisterPage = () => {
                     Müşteri olarak kaydolmak için tıklayın
                   </Link>
                 </p>
+                <p>
+                  <Link to="/company-register" className="text-success">
+                    Firma olarak kaydolmak için tıklayın
+                  </Link>
+                </p>
               </div>
             </Form>
           </Card.Body>

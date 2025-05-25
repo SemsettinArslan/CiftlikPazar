@@ -381,8 +381,6 @@ exports.completeRegistration = asyncHandler(async (req, res, next) => {
         subject: 'Çiftlik Pazar - Çiftçi Başvurunuz Alındı',
         html: html
       });
-      
-      console.log('Bilgilendirme e-postası gönderildi:', email);
     } catch (emailError) {
       console.error('E-posta gönderme hatası:', emailError);
       // E-posta hatası işlemi durdurmaz, sadece loglama yapılır

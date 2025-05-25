@@ -252,6 +252,27 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
+      // Kullanıcının rolü firma ve onay durumu kontrol et
+      if (data.data && data.data.role === 'company') {
+        if (data.data.approvalStatus === 'pending') {
+          Alert.alert(
+            'ErrorResponse',
+            'Firma başvurunuz onay bekliyor. Onaylandığında bilgilendirileceksiniz.',
+            [{ text: 'Tamam' }]
+          );
+          setError('Firma onayı bekliyor');
+          return;
+        } else if (data.data.approvalStatus === 'rejected') {
+          Alert.alert(
+            'ErrorResponse',
+            'Firma başvurunuz reddedildi. Lütfen müşteri hizmetleri ile iletişime geçiniz.',
+            [{ text: 'Tamam' }]
+          );
+          setError('Firma başvurusu reddedildi');
+          return;
+        }
+      }
+
       // İşlem başarılı - kullanıcı verisini kaydet
       console.log('Giriş başarılı, kullanıcı verileri kaydediliyor');
       await AsyncStorage.setItem('user', JSON.stringify(data));
@@ -264,6 +285,8 @@ export const AuthProvider = ({ children }) => {
         router.replace('/admin-dashboard');
       } else if (data.data.role === 'farmer') {
         router.replace('/farmer-dashboard');
+      } else if (data.data.role === 'company') {
+        router.replace('/company-dashboard');
       } else {
         router.replace('/(tabs)');
       }
@@ -356,7 +379,8 @@ export const AuthProvider = ({ children }) => {
     logout,
     setUser,
     API_URL,
-    refreshUserData
+    refreshUserData,
+    token: user?.token || null
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

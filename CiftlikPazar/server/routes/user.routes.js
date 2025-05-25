@@ -6,9 +6,10 @@ const {
   addDeliveryAddress,
   updateDeliveryAddress,
   deleteDeliveryAddress,
-  getDeliveryAddresses
+  getDeliveryAddresses,
+  getUserStats
 } = require('../controllers/user.controller');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -22,5 +23,8 @@ router.get('/delivery-addresses', protect, getDeliveryAddresses);
 router.post('/delivery-addresses', protect, addDeliveryAddress);
 router.put('/delivery-addresses/:id', protect, updateDeliveryAddress);
 router.delete('/delivery-addresses/:id', protect, deleteDeliveryAddress);
+
+// Admin istatistikleri
+router.get('/stats', protect, authorize('admin'), getUserStats);
 
 module.exports = router; 

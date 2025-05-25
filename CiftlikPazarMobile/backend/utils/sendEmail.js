@@ -38,7 +38,7 @@ const sendEmail = async (options) => {
   try {
     // E-postayı gönder
     const info = await transporter.sendMail(mailOptions);
-    console.log('E-posta gönderildi:', info.messageId);
+    console.log(`E-posta başarıyla gönderildi: ${options.subject}`);
     return info;
   } catch (error) {
     console.error('E-posta gönderme hatası:', error);

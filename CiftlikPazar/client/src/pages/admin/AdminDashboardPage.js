@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Alert, Nav, Tab, Badge, Spinner, Button } from 'react-bootstrap';
-import { FaUsers, FaLeaf, FaShoppingCart, FaExclamationTriangle, FaClipboardCheck, FaBox, FaTachometerAlt, FaCog, FaUserCheck, FaExclamationCircle, FaChartBar, FaCheck, FaSync } from 'react-icons/fa';
+import { FaUsers, FaLeaf, FaShoppingCart, FaExclamationTriangle, FaClipboardCheck, FaBox, FaTachometerAlt, FaCog, FaUserCheck, FaExclamationCircle, FaChartBar, FaCheck, FaSync, FaBuilding } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import ProductApprovalList from './ProductApprovalList';
 import FarmerApprovalList from './FarmerApprovalList';
+import CompanyApprovalList from './CompanyApprovalList';
 
 const API_URL = 'http://localhost:3001';
 
@@ -15,6 +16,10 @@ const AdminDashboardPage = () => {
     pendingFarmerCount: 0,
     approvedFarmerCount: 0,
     rejectedFarmerCount: 0,
+    companyCount: 0,
+    pendingCompanyCount: 0,
+    approvedCompanyCount: 0,
+    rejectedCompanyCount: 0,
     orderCount: 0,
     pendingProductCount: 0,
     approvedProductCount: 0,
@@ -77,6 +82,13 @@ const AdminDashboardPage = () => {
       const approvedFarmersPromise = apiClient.get('/api/farmers/approved?count_only=true');
       const rejectedFarmersPromise = apiClient.get('/api/farmers/rejected?count_only=true');
 
+      // Firma istatistiklerini getir - tüm firmaları tek seferde alıp client tarafında filtreleme yapacağız
+      const companiesPromise = apiClient.get('/api/companies');
+
+      // Kullanıcı ve sipariş istatistiklerini getir
+      const userStatsPromise = apiClient.get('/api/users/stats');
+      const orderStatsPromise = apiClient.get('/api/orders/stats');
+
       // Tüm istekleri paralel olarak yap
       const [
         pendingProductsResponse,
@@ -84,14 +96,20 @@ const AdminDashboardPage = () => {
         rejectedProductsResponse,
         pendingFarmersResponse,
         approvedFarmersResponse,
-        rejectedFarmersResponse
+        rejectedFarmersResponse,
+        companiesResponse,
+        userStatsResponse,
+        orderStatsResponse
       ] = await Promise.all([
         pendingProductsPromise,
         approvedProductsPromise,
         rejectedProductsPromise,
         pendingFarmersPromise,
         approvedFarmersPromise,
-        rejectedFarmersPromise
+        rejectedFarmersPromise,
+        companiesPromise,
+        userStatsPromise,
+        orderStatsPromise
       ]);
       
       // Sayım sonuçlarını al (count değerini veya dizinin uzunluğunu)
@@ -107,14 +125,27 @@ const AdminDashboardPage = () => {
       const rejectedFarmerCount = rejectedFarmersResponse.data?.count || 0;
       const totalFarmerCount = pendingFarmerCount + approvedFarmerCount + rejectedFarmerCount;
       
-      // Kullanıcı sayısı ve sipariş sayısını statik veriler (API daha sonra eklenebilir)
+      const companies = companiesResponse.data?.data || [];
+      const pendingCompanyCount = companies.filter(c => c.user && c.user.approvalStatus === 'pending').length;
+      const approvedCompanyCount = companies.filter(c => c.user && c.user.approvalStatus === 'approved').length;
+      const rejectedCompanyCount = companies.filter(c => c.user && c.user.approvalStatus === 'rejected').length;
+      const totalCompanyCount = pendingCompanyCount + approvedCompanyCount + rejectedCompanyCount;
+      
+      // Kullanıcı ve sipariş istatistiklerini al
+      const userCount = userStatsResponse.data?.data?.totalUsers || 0;
+      const orderCount = orderStatsResponse.data?.data?.totalOrders || 0;
+      
       setStats({
-        userCount: 245,
+        userCount,
         farmerCount: totalFarmerCount,
-        pendingFarmerCount: pendingFarmerCount,
-        approvedFarmerCount: approvedFarmerCount, 
-        rejectedFarmerCount: rejectedFarmerCount,
-        orderCount: 189,
+        pendingFarmerCount,
+        approvedFarmerCount, 
+        rejectedFarmerCount,
+        companyCount: totalCompanyCount,
+        pendingCompanyCount,
+        approvedCompanyCount,
+        rejectedCompanyCount,
+        orderCount,
         pendingProductCount,
         approvedProductCount,
         rejectedProductCount,
@@ -246,6 +277,23 @@ const AdminDashboardPage = () => {
                 </Nav.Item>
                 <Nav.Item>
                   <Nav.Link 
+                    eventKey="company-approvals" 
+                    className="border-bottom rounded-0 px-4 py-3"
+                    style={{ 
+                      color: activeTab === 'company-approvals' ? '#4a8e3a' : '#495057',
+                      backgroundColor: activeTab === 'company-approvals' ? 'rgba(74, 142, 58, 0.1)' : 'transparent',
+                      fontWeight: '500',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <FaBuilding className="me-2" /> Firma Başvuruları
+                    {stats.pendingCompanyCount > 0 && (
+                      <Badge bg="danger" pill className="ms-2">{stats.pendingCompanyCount}</Badge>
+                    )}
+                  </Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link 
                     eventKey="user-management" 
                     className="border-bottom rounded-0 px-4 py-3"
                     style={{ 
@@ -282,7 +330,23 @@ const AdminDashboardPage = () => {
             <Card.Body className="p-4">
               <Tab.Content>
                 <Tab.Pane eventKey="overview" active={activeTab === 'overview'}>
-                  <h4 className="border-bottom pb-3 mb-4 text-success">Genel Bakış</h4>
+                  <h4 className="border-bottom pb-3 mb-4 text-success d-flex align-items-center justify-content-between">
+                    <span>Genel Bakış</span>
+                    <Button 
+                      variant="outline-success" 
+                      size="sm" 
+                      className="d-flex align-items-center"
+                      onClick={fetchStats}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <Spinner animation="border" size="sm" className="me-2" />
+                      ) : (
+                        <FaSync className="me-2" />
+                      )}
+                      İstatistikleri Güncelle
+                    </Button>
+                  </h4>
                   
                   <Row className="g-4 mb-4">
                     <Col md={6} xl={3} className="mb-4">
@@ -292,8 +356,17 @@ const AdminDashboardPage = () => {
                             <h5 className="mb-0 text-dark">Kullanıcılar</h5>
                             <FaUsers className="text-success" size={24} />
                           </div>
-                          <h2 className="fw-bold mb-0">{stats.userCount}</h2>
-                          <p className="text-muted mb-0">Toplam kullanıcı sayısı</p>
+                          {loading ? (
+                            <div className="d-flex align-items-center py-2">
+                              <Spinner animation="border" size="sm" className="text-success me-2" />
+                              <span className="text-muted">Yükleniyor...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <h2 className="fw-bold mb-0">{stats.userCount}</h2>
+                              <p className="text-muted mb-0">Toplam kullanıcı sayısı</p>
+                            </>
+                          )}
                         </Card.Body>
                       </Card>
                     </Col>
@@ -305,23 +378,69 @@ const AdminDashboardPage = () => {
                             <h5 className="mb-0 text-dark">Çiftçiler</h5>
                             <FaLeaf className="text-success" size={24} />
                           </div>
-                          <h2 className="fw-bold mb-0">{stats.farmerCount}</h2>
-                          <p className="text-muted mb-0">Toplam çiftçi sayısı</p>
-                          <div className="mt-3 d-flex flex-wrap gap-2">
-                            <Badge bg="success" className="py-1 px-2">
-                              {stats.approvedFarmerCount} onaylı
-                            </Badge>
-                          {stats.pendingFarmerCount > 0 && (
-                              <Badge bg="warning" className="py-1 px-2">
-                                {stats.pendingFarmerCount} bekleyen
-                              </Badge>
-                            )}
-                            {stats.rejectedFarmerCount > 0 && (
-                              <Badge bg="danger" className="py-1 px-2">
-                                {stats.rejectedFarmerCount} reddedilen
-                              </Badge>
-                            )}
+                          {loading ? (
+                            <div className="d-flex align-items-center py-2">
+                              <Spinner animation="border" size="sm" className="text-success me-2" />
+                              <span className="text-muted">Yükleniyor...</span>
                             </div>
+                          ) : (
+                            <>
+                              <h2 className="fw-bold mb-0">{stats.farmerCount}</h2>
+                              <p className="text-muted mb-0">Toplam çiftçi sayısı</p>
+                              <div className="mt-3 d-flex flex-wrap gap-2">
+                                <Badge bg="success" className="py-1 px-2">
+                                  {stats.approvedFarmerCount} onaylı
+                                </Badge>
+                                {stats.pendingFarmerCount > 0 && (
+                                  <Badge bg="warning" className="py-1 px-2">
+                                    {stats.pendingFarmerCount} bekleyen
+                                  </Badge>
+                                )}
+                                {stats.rejectedFarmerCount > 0 && (
+                                  <Badge bg="danger" className="py-1 px-2">
+                                    {stats.rejectedFarmerCount} reddedilen
+                                  </Badge>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    
+                    <Col md={6} xl={3} className="mb-4">
+                      <Card className="border-0 shadow-sm h-100">
+                        <Card.Body className="d-flex flex-column p-4">
+                          <div className="d-flex justify-content-between align-items-center mb-3">
+                            <h5 className="mb-0 text-dark">Firmalar</h5>
+                            <FaBuilding className="text-success" size={24} />
+                          </div>
+                          {loading ? (
+                            <div className="d-flex align-items-center py-2">
+                              <Spinner animation="border" size="sm" className="text-success me-2" />
+                              <span className="text-muted">Yükleniyor...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <h2 className="fw-bold mb-0">{stats.companyCount}</h2>
+                              <p className="text-muted mb-0">Toplam firma sayısı</p>
+                              <div className="mt-3 d-flex flex-wrap gap-2">
+                                <Badge bg="success" className="py-1 px-2">
+                                  {stats.approvedCompanyCount} onaylı
+                                </Badge>
+                                {stats.pendingCompanyCount > 0 && (
+                                  <Badge bg="warning" className="py-1 px-2">
+                                    {stats.pendingCompanyCount} bekleyen
+                                  </Badge>
+                                )}
+                                {stats.rejectedCompanyCount > 0 && (
+                                  <Badge bg="danger" className="py-1 px-2">
+                                    {stats.rejectedCompanyCount} reddedilen
+                                  </Badge>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </Card.Body>
                       </Card>
                     </Col>
@@ -333,8 +452,17 @@ const AdminDashboardPage = () => {
                             <h5 className="mb-0 text-dark">Siparişler</h5>
                             <FaShoppingCart className="text-success" size={24} />
                           </div>
-                          <h2 className="fw-bold mb-0">{stats.orderCount}</h2>
-                          <p className="text-muted mb-0">Toplam sipariş sayısı</p>
+                          {loading ? (
+                            <div className="d-flex align-items-center py-2">
+                              <Spinner animation="border" size="sm" className="text-success me-2" />
+                              <span className="text-muted">Yükleniyor...</span>
+                            </div>
+                          ) : (
+                            <>
+                              <h2 className="fw-bold mb-0">{stats.orderCount}</h2>
+                              <p className="text-muted mb-0">Toplam sipariş sayısı</p>
+                            </>
+                          )}
                         </Card.Body>
                       </Card>
                     </Col>
@@ -346,23 +474,32 @@ const AdminDashboardPage = () => {
                             <h5 className="mb-0 text-dark">Ürünler</h5>
                             <FaBox className="text-success" size={24} />
                           </div>
-                          <h2 className="fw-bold mb-0">{stats.totalProductCount || 0}</h2>
-                          <p className="text-muted mb-0">Toplam ürün sayısı</p>
-                          <div className="mt-3 d-flex flex-wrap gap-2">
-                            <Badge bg="success" className="py-1 px-2">
-                              {stats.approvedProductCount || 0} onaylı
-                            </Badge>
-                            {stats.pendingProductCount > 0 && (
-                              <Badge bg="warning" className="py-1 px-2">
-                                {stats.pendingProductCount} bekleyen
-                              </Badge>
-                            )}
-                            {stats.rejectedProductCount > 0 && (
-                              <Badge bg="danger" className="py-1 px-2">
-                                {stats.rejectedProductCount} reddedilen
-                              </Badge>
-                            )}
+                          {loading ? (
+                            <div className="d-flex align-items-center py-2">
+                              <Spinner animation="border" size="sm" className="text-success me-2" />
+                              <span className="text-muted">Yükleniyor...</span>
                             </div>
+                          ) : (
+                            <>
+                              <h2 className="fw-bold mb-0">{stats.totalProductCount || 0}</h2>
+                              <p className="text-muted mb-0">Toplam ürün sayısı</p>
+                              <div className="mt-3 d-flex flex-wrap gap-2">
+                                <Badge bg="success" className="py-1 px-2">
+                                  {stats.approvedProductCount || 0} onaylı
+                                </Badge>
+                                {stats.pendingProductCount > 0 && (
+                                  <Badge bg="warning" className="py-1 px-2">
+                                    {stats.pendingProductCount} bekleyen
+                                  </Badge>
+                                )}
+                                {stats.rejectedProductCount > 0 && (
+                                  <Badge bg="danger" className="py-1 px-2">
+                                    {stats.rejectedProductCount} reddedilen
+                                  </Badge>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </Card.Body>
                       </Card>
                     </Col>
@@ -430,6 +567,73 @@ const AdminDashboardPage = () => {
                             <Alert variant="success" className="d-flex align-items-center mb-0">
                               <FaCheck className="me-2" />
                               Bekleyen çiftçi başvurusu bulunmamaktadır.
+                            </Alert>
+                          )}
+                        </Card.Body>
+                      </Card>
+                    </Col>
+                    
+                    <Col md={6} className="mb-4">
+                      <Card className="border-0 shadow-sm h-100">
+                        <Card.Body className="p-4">
+                          <h5 className="mb-3 text-success d-flex align-items-center">
+                            <div className="bg-success bg-opacity-10 p-2 rounded-circle me-2">
+                              <FaBuilding className="text-success" />
+                            </div>
+                            Firma Başvuruları
+                          </h5>
+                          
+                          <div className="mb-3">
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span>Onaylanan</span>
+                              <span className="fw-bold text-success">{stats.approvedCompanyCount}</span>
+                            </div>
+                            <div className="progress" style={{ height: '10px' }}>
+                              <div 
+                                className="progress-bar bg-success" 
+                                style={{ width: `${stats.companyCount > 0 ? (stats.approvedCompanyCount / stats.companyCount) * 100 : 0}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          <div className="mb-3">
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span>Bekleyen</span>
+                              <span className="fw-bold text-warning">{stats.pendingCompanyCount}</span>
+                            </div>
+                            <div className="progress" style={{ height: '10px' }}>
+                              <div 
+                                className="progress-bar bg-warning" 
+                                style={{ width: `${stats.companyCount > 0 ? (stats.pendingCompanyCount / stats.companyCount) * 100 : 0}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          <div className="mb-4">
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span>Reddedilen</span>
+                              <span className="fw-bold text-danger">{stats.rejectedCompanyCount}</span>
+                            </div>
+                            <div className="progress" style={{ height: '10px' }}>
+                              <div 
+                                className="progress-bar bg-danger" 
+                                style={{ width: `${stats.companyCount > 0 ? (stats.rejectedCompanyCount / stats.companyCount) * 100 : 0}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                          
+                          {stats.pendingCompanyCount > 0 ? (
+                            <Button 
+                              variant="outline-success" 
+                              className="rounded-pill px-4 w-100"
+                              onClick={() => handleTabChange('company-approvals')}
+                            >
+                              <FaBuilding className="me-2" /> {stats.pendingCompanyCount} Başvuruyu İncele
+                            </Button>
+                          ) : (
+                            <Alert variant="success" className="d-flex align-items-center mb-0">
+                              <FaCheck className="me-2" />
+                              Bekleyen firma başvurusu bulunmamaktadır.
                             </Alert>
                           )}
                         </Card.Body>
@@ -511,6 +715,10 @@ const AdminDashboardPage = () => {
                 
                 <Tab.Pane eventKey="farmer-approvals" active={activeTab === 'farmer-approvals'}>
                   <FarmerApprovalList apiClient={apiClient} onApprovalUpdate={handleApprovalUpdate} />
+                </Tab.Pane>
+                
+                <Tab.Pane eventKey="company-approvals" active={activeTab === 'company-approvals'}>
+                  <CompanyApprovalList apiClient={apiClient} onApprovalUpdate={handleApprovalUpdate} />
                 </Tab.Pane>
                 
                 <Tab.Pane eventKey="user-management" active={activeTab === 'user-management'}>

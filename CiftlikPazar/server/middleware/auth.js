@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const Farmer = require('../models/farmer.model');
 
 // Kimlik doğrulama ara yazılımı
 exports.protect = async (req, res, next) => {
@@ -25,6 +26,14 @@ exports.protect = async (req, res, next) => {
 
     if (!req.user) {
       return res.status(401).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    // Eğer kullanıcı çiftçi ise, çiftçi ID'sini ekle
+    if (req.user.role === 'farmer') {
+      const farmer = await Farmer.findOne({ user: req.user._id });
+      if (farmer) {
+        req.user.farmerId = farmer._id;
+      }
     }
 
     next();

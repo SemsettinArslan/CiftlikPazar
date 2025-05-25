@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import { getApiBaseUrl } from '../utils/networkUtils';
 
 // Ürün tipi
 type Product = {
@@ -18,12 +19,30 @@ type Product = {
   };
 };
 
+// Kupon tipi
+type Coupon = {
+  _id: string;
+  code: string;
+  description: string;
+  type: 'percentage' | 'fixed';
+  value: number;
+  minimumPurchase: number;
+  maximumDiscountAmount: number | null;
+  usageLimit: number | null;
+  usedCount: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+};
+
 // Sepet state tipi
 type CartState = {
   items: Product[];
   totalItems: number;
   totalPrice: number;
   currentFarmerId: string | null;
+  coupon: Coupon | null;
+  discountAmount: number;
 };
 
 // Sepet aksiyonları
@@ -32,7 +51,9 @@ type CartAction =
   | { type: 'REMOVE_FROM_CART'; payload: { _id: string } }
   | { type: 'UPDATE_QUANTITY'; payload: { _id: string; quantity: number } }
   | { type: 'CLEAR_CART' }
-  | { type: 'REPLACE_CART'; payload: CartState };
+  | { type: 'REPLACE_CART'; payload: CartState }
+  | { type: 'APPLY_COUPON'; payload: { coupon: Coupon; discountAmount: number } }
+  | { type: 'REMOVE_COUPON' };
 
 // Context tipi
 type CartContextType = {
@@ -45,6 +66,10 @@ type CartContextType = {
   getCartTotal: () => number;
   getShippingFee: () => number;
   getOrderTotal: () => number;
+  applyCoupon: (couponCode: string) => Promise<boolean>;
+  removeCoupon: () => void;
+  couponLoading: boolean;
+  couponError: string | null;
 };
 
 // Context oluştur
@@ -110,15 +135,19 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       
       if (!removedItem) return state;
       
-      // Eğer son ürün de kaldırıldıysa currentFarmerId'yi sıfırla
+      // Eğer son ürün de kaldırıldıysa currentFarmerId'yi ve kuponu sıfırla
       const newCurrentFarmerId = filteredItems.length === 0 ? null : state.currentFarmerId;
+      const newCoupon = filteredItems.length === 0 ? null : state.coupon;
+      const newDiscountAmount = filteredItems.length === 0 ? 0 : state.discountAmount;
       
       return {
         ...state,
         items: filteredItems,
         totalItems: state.totalItems - removedItem.quantity,
         totalPrice: state.totalPrice - (removedItem.price * removedItem.quantity),
-        currentFarmerId: newCurrentFarmerId
+        currentFarmerId: newCurrentFarmerId,
+        coupon: newCoupon,
+        discountAmount: newDiscountAmount
       };
 
     case 'UPDATE_QUANTITY':
@@ -128,7 +157,6 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           const stockLimit = item.countInStock || Infinity;
           const safeQuantity = Math.min(action.payload.quantity, stockLimit);
           
-          // Güncellenmiş ürün
           return {
             ...item,
             quantity: safeQuantity
@@ -144,11 +172,26 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
       
       const quantityDifference = updatedItem.quantity - oldItem.quantity;
       
+      // İndirim hesabını tekrar yap
+      let discountAmount = state.discountAmount;
+      const newTotalPrice = state.totalPrice + (quantityDifference * updatedItem.price);
+      
+      if (state.coupon) {
+        // Kupon yüzdelik ise yeniden hesapla, sabit ise aynı kalır
+        if (state.coupon.type === 'percentage') {
+          discountAmount = Math.min(
+            (newTotalPrice * state.coupon.value) / 100,
+            state.coupon.maximumDiscountAmount || Infinity
+          );
+        }
+      }
+      
       return {
         ...state,
         items: updatedItems,
         totalItems: state.totalItems + quantityDifference,
-        totalPrice: state.totalPrice + (quantityDifference * updatedItem.price)
+        totalPrice: newTotalPrice,
+        discountAmount: discountAmount
       };
 
     case 'CLEAR_CART':
@@ -156,12 +199,28 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         items: [],
         totalItems: 0,
         totalPrice: 0,
-        currentFarmerId: null
+        currentFarmerId: null,
+        coupon: null,
+        discountAmount: 0
       };
       
     case 'REPLACE_CART':
       return {
         ...action.payload
+      };
+
+    case 'APPLY_COUPON':
+      return {
+        ...state,
+        coupon: action.payload.coupon,
+        discountAmount: action.payload.discountAmount
+      };
+      
+    case 'REMOVE_COUPON':
+      return {
+        ...state,
+        coupon: null,
+        discountAmount: 0
       };
 
     default:
@@ -175,12 +234,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     items: [],
     totalItems: 0,
     totalPrice: 0,
-    currentFarmerId: null
+    currentFarmerId: null,
+    coupon: null,
+    discountAmount: 0
   };
 
   const [state, dispatch] = useReducer(cartReducer, initialState);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
 
   // AsyncStorage'dan sepet verisini yükle
   useEffect(() => {
@@ -313,7 +376,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getCartTotal = () => {
-    return state.totalPrice;
+    return Math.max(0, state.totalPrice - state.discountAmount);
   };
 
   // Kargo ücreti
@@ -327,6 +390,56 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return getCartTotal() + getShippingFee();
   };
 
+  // Kupon işlemleri
+  const applyCoupon = async (couponCode: string): Promise<boolean> => {
+    try {
+      setCouponLoading(true);
+      setCouponError(null);
+      
+      const response = await fetch(`${getApiBaseUrl()}/coupons/check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code: couponCode,
+          cartTotal: state.totalPrice
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        setCouponError(data.message || 'Kupon uygulanırken bir hata oluştu');
+        return false;
+      }
+      
+      if (data.success) {
+        const { coupon, discountAmount } = data.data;
+        
+        dispatch({
+          type: 'APPLY_COUPON',
+          payload: { coupon, discountAmount }
+        });
+        
+        return true;
+      }
+      
+      setCouponError('Bilinmeyen bir hata oluştu');
+      return false;
+    } catch (error) {
+      console.error('Kupon hatası:', error);
+      setCouponError('Sunucu bağlantı hatası');
+      return false;
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+  
+  const removeCoupon = () => {
+    dispatch({ type: 'REMOVE_COUPON' });
+  };
+
   return (
     <CartContext.Provider
       value={{
@@ -338,7 +451,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         getCartItemCount,
         getCartTotal,
         getShippingFee,
-        getOrderTotal
+        getOrderTotal,
+        applyCoupon,
+        removeCoupon,
+        couponLoading,
+        couponError
       }}
     >
       {children}

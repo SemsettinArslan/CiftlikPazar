@@ -22,23 +22,12 @@ export default function AdminDashboardScreen() {
     totalUsers: 0,
     approvedFarmers: 0,
     pendingFarmers: 0,
+    pendingCompanies: 0,
     totalOrders: 0,
     pendingActions: 0,
   });
   const [error, setError] = useState<string | null>(null);
   
-  // Normal kullanıcı ise ana sayfaya yönlendir
-  useEffect(() => {
-    if (user && user.data && user.data.role !== 'admin') {
-      router.replace('/(tabs)');
-    }
-  }, [user]);
-  
-  // Admin olmayan kullanıcıları yönlendir
-  if (user && user.data && user.data.role !== 'admin') {
-    return null;
-  }
-
   // Çıkış fonksiyonu - Alert ile onay alarak
   const handleLogout = () => {
     Alert.alert(
@@ -65,7 +54,11 @@ export default function AdminDashboardScreen() {
     
     try {
       // İstatistikleri toplamak için gerekli API çağrıları
-      const token = user.token;
+      const token = user?.token;
+      
+      if (!token) {
+        throw new Error('Token bulunamadı');
+      }
       
       const config = {
         method: 'GET',
@@ -94,16 +87,36 @@ export default function AdminDashboardScreen() {
         pendingFarmersCount = pendingFarmersData.farmers.length;
       }
       
+      // Bekleyen firma sayısını al
+      let pendingCompaniesCount = 0;
+      try {
+        const pendingCompaniesResponse = await fetch(`${API_URL}/companies/pending`, config);
+        if (pendingCompaniesResponse.ok) {
+          const pendingCompaniesData = await pendingCompaniesResponse.json();
+          if (pendingCompaniesData.count) {
+            pendingCompaniesCount = pendingCompaniesData.count;
+          } else if (pendingCompaniesData.data && Array.isArray(pendingCompaniesData.data)) {
+            pendingCompaniesCount = pendingCompaniesData.data.length;
+          } else if (pendingCompaniesData.companies && Array.isArray(pendingCompaniesData.companies)) {
+            pendingCompaniesCount = pendingCompaniesData.companies.length;
+          }
+        }
+      } catch (error) {
+        console.error('Bekleyen firma verileri alınamadı:', error);
+        pendingCompaniesCount = 3; // Varsayılan değer
+      }
+      
       // Diğer istatistikleri al (mockup değerler)
       const totalUsersCount = 245;
       const approvedFarmersCount = 38;
       const totalOrdersCount = 189;
-      const pendingActionsCount = 7;
+      const pendingActionsCount = pendingFarmersCount + pendingCompaniesCount;
 
       setStats({
         totalUsers: totalUsersCount,
         approvedFarmers: approvedFarmersCount,
         pendingFarmers: pendingFarmersCount,
+        pendingCompanies: pendingCompaniesCount,
         totalOrders: totalOrdersCount,
         pendingActions: pendingActionsCount
       });
@@ -119,8 +132,9 @@ export default function AdminDashboardScreen() {
         totalUsers: 245,
         approvedFarmers: 38,
         pendingFarmers: 5,
+        pendingCompanies: 3,
         totalOrders: 189,
-        pendingActions: 7
+        pendingActions: 8
       });
       
       setIsLoading(false);
@@ -133,9 +147,23 @@ export default function AdminDashboardScreen() {
     fetchAdminStats();
   }, []);
 
+  // Normal kullanıcı ise ana sayfaya yönlendir
   useEffect(() => {
-    fetchAdminStats();
+    if (user && user.data && user.data.role !== 'admin') {
+      router.replace('/(tabs)');
+    }
+  }, [user, router]);
+  
+  useEffect(() => {
+    if (user?.token && API_URL) {
+      fetchAdminStats();
+    }
   }, [API_URL, user?.token]);
+  
+  // Admin olmayan kullanıcıları yönlendir
+  if (user && user.data && user.data.role !== 'admin') {
+    return null;
+  }
   
   // Admin verilerini yüklerken gösterilecek yükleme ekranı
   if (isLoading) {
@@ -147,6 +175,44 @@ export default function AdminDashboardScreen() {
     );
   }
   
+  const dashboardItems = [
+    {
+      id: '1',
+      title: 'Kullanıcı Yönetimi',
+      icon: 'people-outline' as const,
+      description: 'Kullanıcıları görüntüle ve yönet',
+      route: '/admin/users'
+    },
+    {
+      id: '2',
+      title: 'Çiftçi Onayları',
+      icon: 'checkmark-circle-outline' as const,
+      description: `${stats.pendingFarmers} çiftçi onay bekliyor`,
+      route: '/admin/farmer-requests'
+    },
+    {
+      id: '3',
+      title: 'Firma Onayları',
+      icon: 'business-outline' as const,
+      description: `${stats.pendingCompanies} firma onay bekliyor`,
+      route: '/admin/company-requests'
+    },
+    {
+      id: '4',
+      title: 'Ürün Yönetimi',
+      icon: 'leaf-outline' as const,
+      description: 'Onay bekleyen ürünleri yönet',
+      route: '/admin/product-management'
+    },
+    {
+      id: '5',
+      title: 'Sipariş Yönetimi',
+      icon: 'cart-outline' as const,
+      description: `${stats.totalOrders} sipariş işlenmemiş`,
+      route: '/admin/orders'
+    }
+  ];
+  
   return (
     <View style={{ flex: 1 }}>
       <Stack.Screen 
@@ -157,6 +223,7 @@ export default function AdminDashboardScreen() {
           headerStyle: {
             backgroundColor: '#3F51B5',
           },
+          headerBackVisible: false,
         }}
       />
       
@@ -202,15 +269,15 @@ export default function AdminDashboardScreen() {
               <Ionicons name="time-outline" size={24} color="#FF9800" />
             </View>
             <Text style={styles.statValue}>{stats.pendingFarmers}</Text>
-            <Text style={styles.statLabel}>Onay Bekleyen</Text>
+            <Text style={styles.statLabel}>Bekleyen Çiftçi</Text>
           </View>
           
           <View style={styles.statCard}>
             <View style={[styles.iconWrapper, {backgroundColor: 'rgba(156, 39, 176, 0.2)'}]}>
-              <Ionicons name="cart-outline" size={24} color="#9C27B0" />
+              <Ionicons name="business-outline" size={24} color="#9C27B0" />
             </View>
-            <Text style={styles.statValue}>{stats.totalOrders}</Text>
-            <Text style={styles.statLabel}>Toplam Sipariş</Text>
+            <Text style={styles.statValue}>{stats.pendingCompanies}</Text>
+            <Text style={styles.statLabel}>Bekleyen Firma</Text>
           </View>
         </View>
         
@@ -219,47 +286,15 @@ export default function AdminDashboardScreen() {
           <Text style={styles.sectionTitle}>Admin İşlemleri</Text>
           
           <View style={styles.menuGrid}>
-            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/admin/farmer-requests' as any)}>
-              <View style={[styles.menuIcon, { backgroundColor: '#3F51B5' }]}>
-                <Ionicons name="person-add-outline" size={24} color="#fff" />
-              </View>
-              <Text style={styles.menuTitle}>Çiftçi Başvuruları</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/admin/users' as any)}>
-              <View style={[styles.menuIcon, { backgroundColor: '#2196F3' }]}>
-                <Ionicons name="people-outline" size={24} color="#fff" />
-              </View>
-              <Text style={styles.menuTitle}>Kullanıcı Yönetimi</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/admin/products' as any)}>
-              <View style={[styles.menuIcon, { backgroundColor: '#4CAF50' }]}>
-                <Ionicons name="leaf-outline" size={24} color="#fff" />
-              </View>
-              <Text style={styles.menuTitle}>Ürün Yönetimi</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/admin/orders' as any)}>
-              <View style={[styles.menuIcon, { backgroundColor: '#FF9800' }]}>
-                <Ionicons name="cart-outline" size={24} color="#fff" />
-              </View>
-              <Text style={styles.menuTitle}>Sipariş Takibi</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/admin/categories' as any)}>
-              <View style={[styles.menuIcon, { backgroundColor: '#9C27B0' }]}>
-                <Ionicons name="list-outline" size={24} color="#fff" />
-              </View>
-              <Text style={styles.menuTitle}>Kategori Yönetimi</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.menuCard} onPress={() => router.push('/admin/settings' as any)}>
-              <View style={[styles.menuIcon, { backgroundColor: '#607D8B' }]}>
-                <Ionicons name="settings-outline" size={24} color="#fff" />
-              </View>
-              <Text style={styles.menuTitle}>Site Ayarları</Text>
-            </TouchableOpacity>
+            {dashboardItems.map((item) => (
+              <TouchableOpacity key={item.id} style={styles.menuCard} onPress={() => router.push(item.route as any)}>
+                <View style={[styles.menuIcon, { backgroundColor: '#3F51B5' }]}>
+                  <Ionicons name={item.icon} size={24} color="#fff" />
+                </View>
+                <Text style={styles.menuTitle}>{item.title}</Text>
+                <Text style={styles.menuDescription}>{item.description}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -404,6 +439,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
+  },
+  menuDescription: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 5,
   },
   
   // Yeni çıkış butonu stili

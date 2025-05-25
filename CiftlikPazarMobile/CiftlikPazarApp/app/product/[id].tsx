@@ -240,7 +240,7 @@ export default function ProductDetailScreen() {
               <Text style={styles.categoryText}>
                 {typeof product.category === 'string' 
                   ? product.category 
-                  : (product.category.category_name || product.category.name || 'Kategori')}
+                  : (product.category.name || product.category.category_name || 'Kategori Belirtilmemiş')}
               </Text>
             </View>
           )}
@@ -343,7 +343,9 @@ export default function ProductDetailScreen() {
                   <Text style={styles.farmerName}>
                     {typeof product.farmer === 'string' 
                       ? 'Çiftlik' 
-                      : (product.farmer.farmName || 'Çiftlik Adı')}
+                      : (product.farmer.farmName || 
+                         (product.farmer.user && `${product.farmer.user.firstName} ${product.farmer.user.lastName}`) || 
+                         'Çiftçi Bilinmeyen')}
                   </Text>
                   {product.farmer && typeof product.farmer !== 'string' && (product.farmer.city || product.farmer.district) && (
                     <Text style={styles.farmerLocation}>

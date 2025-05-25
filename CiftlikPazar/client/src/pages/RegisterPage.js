@@ -341,14 +341,16 @@ const RegisterPage = () => {
 
             <div className="text-center mt-3">
               <p>
-                Zaten hesabınız var mı?{' '}
-                <Link to="/login" className="text-success">
-                  Giriş Yap
-                </Link>
+                Zaten hesabınız var mı? <Link to="/login" className="text-success">Giriş Yap</Link>
               </p>
               <p>
                 <Link to="/farmer-register" className="text-success">
-                  Çiftçi başvurusu yapmak için tıklayın
+                  Çiftçi olarak kaydolmak için tıklayın
+                </Link>
+              </p>
+              <p>
+                <Link to="/company-register" className="text-success">
+                  Firma olarak kaydolmak için tıklayın
                 </Link>
               </p>
             </div>

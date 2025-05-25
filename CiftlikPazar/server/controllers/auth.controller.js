@@ -191,6 +191,45 @@ exports.login = async (req, res) => {
       }
     }
 
+    // Firma hesabı ve onay durumu kontrolü
+    if (user.role === 'company') {
+      console.log(`[DEBUG] Firma hesabı kontrolü - ApprovalStatus: ${user.approvalStatus}`);
+      
+      if (user.approvalStatus === 'pending') {
+        console.log(`[DEBUG] Firma hesabı onay bekliyor: ${user.email}`);
+        return res.status(401).json({
+          success: false,
+          message: 'Firma hesabınız hala inceleme aşamasında'
+        });
+      } else if (user.approvalStatus === 'rejected') {
+        console.log(`[DEBUG] Firma hesabı reddedildi: ${user.email}`);
+        return res.status(401).json({
+          success: false,
+          message: 'Firma başvurunuz reddedildi. Lütfen destek ekibiyle iletişime geçin.'
+        });
+      }
+      
+      // İlişkili firma kaydı var mı kontrol et
+      try {
+        const Company = require('../models/company.model');
+        const companyRecord = await Company.findOne({ user: user._id });
+        
+        console.log(`[DEBUG] Firma kaydı aranıyor - User ID: ${user._id}`);
+        
+        if (!companyRecord) {
+          console.log(`[DEBUG] Firma kaydı bulunamadı! User ID: ${user._id}`);
+          return res.status(401).json({
+            success: false,
+            message: 'Firma hesabınız eksik. Lütfen destek ekibiyle iletişime geçin.'
+          });
+        }
+        
+        console.log(`[DEBUG] Firma kaydı bulundu - Company ID: ${companyRecord._id}, Company Name: ${companyRecord.companyName}`);
+      } catch (error) {
+        console.error(`[DEBUG] Firma kaydı kontrol edilirken hata: ${error.message}`);
+      }
+    }
+
     // Son giriş tarihini güncelle
     await User.findByIdAndUpdate(user._id, { lastLoginAt: Date.now() });
 

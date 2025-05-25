@@ -1,50 +1,79 @@
 const mongoose = require('mongoose');
 
+// Sipariş öğesi şeması
+const OrderItemSchema = new mongoose.Schema({
+  product: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Product',
+    required: true
+  },
+  name: {
+    type: String,
+    required: true
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: [1, 'Miktar en az 1 olmalıdır']
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: [0, 'Fiyat 0 veya daha büyük olmalıdır']
+  },
+  image: {
+    type: String
+  },
+  unit: {
+    type: String,
+    default: 'kg'
+  },
+  farmer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Farmer'
+  }
+});
+
+// Teslimat adresi şeması
+const ShippingAddressSchema = new mongoose.Schema({
+  fullName: {
+    type: String,
+    required: true
+  },
+  address: {
+    type: String,
+    required: true
+  },
+  city: {
+    type: String,
+    required: true
+  },
+  district: {
+    type: String,
+    required: true
+  },
+  postalCode: {
+    type: String
+  },
+  phone: {
+    type: String,
+    required: true
+  }
+});
+
+// Sipariş şeması
 const OrderSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Users',
     required: true
   },
-  items: [{
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true
-    },
-    name: String,
-    quantity: {
-      type: Number,
-      required: true,
-      min: [1, 'Miktar en az 1 olmalıdır']
-    },
-    price: {
-      type: Number,
-      required: true
-    },
-    unit: String,
-    image: String
-  }],
-  shippingAddress: {
-    title: String,
-    address: {
-      type: String,
-      required: [true, 'Adres bilgisi gereklidir']
-    },
-    city: {
-      type: String,
-      required: [true, 'Şehir bilgisi gereklidir']
-    },
-    postalCode: String,
-    phoneNumber: {
-      type: String,
-      required: [true, 'Telefon numarası gereklidir']
-    }
-  },
+  items: [OrderItemSchema],
+  shippingAddress: ShippingAddressSchema,
   paymentMethod: {
     type: String,
-    required: [true, 'Ödeme yöntemi gereklidir'],
-    enum: ['kapıda ödeme', 'kredi kartı', 'havale/eft']
+    required: true,
+    default: 'Kapıda Ödeme'
   },
   paymentResult: {
     id: String,
@@ -52,45 +81,79 @@ const OrderSchema = new mongoose.Schema({
     update_time: String,
     email_address: String
   },
-  itemsPrice: {
-    type: Number,
-    required: true,
-    default: 0.0
-  },
-  shippingPrice: {
-    type: Number,
-    required: true,
-    default: 0.0
-  },
   totalPrice: {
     type: Number,
     required: true,
     default: 0.0
+  },
+  shippingFee: {
+    type: Number,
+    required: true,
+    default: 0.0
+  },
+  discountAmount: {
+    type: Number,
+    default: 0.0
+  },
+  totalAmount: {
+    type: Number,
+    required: true,
+    default: 0.0
+  },
+  coupon: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Coupon'
+  },
+  status: {
+    type: String,
+    required: true,
+    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+    default: 'pending'
   },
   isPaid: {
     type: Boolean,
     required: true,
     default: false
   },
-  paidAt: Date,
-  status: {
-    type: String,
-    required: true,
-    enum: ['sipariş alındı', 'hazırlanıyor', 'kargoya verildi', 'teslim edildi', 'iptal edildi'],
-    default: 'sipariş alındı'
+  paidAt: {
+    type: Date
   },
   isDelivered: {
     type: Boolean,
     required: true,
     default: false
   },
-  deliveredAt: Date,
-  note: String,
-  sellerNote: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
+  deliveredAt: {
+    type: Date
+  },
+  estimatedDelivery: {
+    type: Date
+  },
+  trackingNumber: {
+    type: String
+  },
+  notes: {
+    type: String
+  },
+  sellerNote: {
+    type: String
   }
+}, {
+  timestamps: true
+});
+
+// Sipariş numarası oluşturma
+OrderSchema.pre('save', function(next) {
+  if (this.isNew) {
+    const date = new Date();
+    const year = date.getFullYear().toString().substr(-2);
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    
+    this.orderNumber = `CP${year}${month}${day}${random}`;
+  }
+  next();
 });
 
 module.exports = mongoose.model('Order', OrderSchema); 

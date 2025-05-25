@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Carousel, Spinner } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { FaLeaf, FaShippingFast, FaHandshake, FaSeedling, FaShoppingCart } from 'react-icons/fa';
+import { FaLeaf, FaShippingFast, FaHandshake, FaSeedling, FaShoppingCart, FaBuilding, FaTractor } from 'react-icons/fa';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 import { toast } from 'react-toastify';
@@ -215,6 +215,33 @@ const HomePage = () => {
           transform: translateY(-5px);
           box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
         }
+        
+        .bg-primary-dark {
+          background-color: #0b5ed7;
+        }
+        
+        .registration-carousel .carousel-control-prev,
+        .registration-carousel .carousel-control-next {
+          width: 10%;
+          opacity: 0.8;
+        }
+        
+        .registration-carousel .carousel-control-prev-icon,
+        .registration-carousel .carousel-control-next-icon {
+          background-color: transparent;
+          width: 40px;
+          height: 40px;
+          background-size: 100%;
+        }
+        
+        .registration-carousel .carousel-item {
+          transition: transform 0.6s ease-in-out;
+        }
+        
+        .registration-carousel .carousel-item > div {
+          box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+          overflow: hidden;
+        }
       `}</style>
 
       {/* Testimonials */}
@@ -248,19 +275,48 @@ const HomePage = () => {
         </Row>
       </Container>
 
-      {/* Call to Action */}
-      <Container className="my-5">
+      {/* Registration Call to Action Carousel */}
+      <Container className="my-5 pb-5">
         <Row className="justify-content-center">
           <Col md={10}>
+            <Carousel 
+              className="registration-carousel" 
+              interval={5000} 
+              controls={true} 
+              indicators={false}
+            >
+              {/* Farmer Registration */}
+              <Carousel.Item>
             <div className="bg-success text-white p-5 text-center rounded">
+                  <div className="d-flex flex-column align-items-center">
+                    <FaTractor className="mb-3" size={48} />
               <h2 className="fw-bold">Siz de üretici olmak ister misiniz?</h2>
               <p className="lead mb-4">
-                Ürünlerinizi aracısız bir şekilde müşterilerle buluşturun, daha fazka kazanç elde edin.
+                      Ürünlerinizi aracısız bir şekilde müşterilerle buluşturun, daha fazla kazanç elde edin.
               </p>
               <Button as={Link} to="/farmer-register" variant="light" size="lg">
                 Çiftçi Başvurusu Yap
               </Button>
             </div>
+                </div>
+              </Carousel.Item>
+              
+              {/* Company Registration */}
+              <Carousel.Item>
+                <div className="bg-primary-dark text-white p-5 text-center rounded">
+                  <div className="d-flex flex-column align-items-center">
+                    <FaBuilding className="mb-3" size={48} />
+                    <h2 className="fw-bold">Firma hesabı oluşturmak ister misiniz?</h2>
+                    <p className="lead mb-4">
+                      Üreticilerle doğrudan iletişim kurabilmek, toplu alım yapabilmek ve özel teklifler alabilmek için firma hesabınızı oluşturun.
+                    </p>
+                    <Button as={Link} to="/company-register" variant="light" size="lg">
+                      Firma Başvurusu Yap
+                    </Button>
+                  </div>
+                </div>
+              </Carousel.Item>
+            </Carousel>
           </Col>
         </Row>
       </Container>
